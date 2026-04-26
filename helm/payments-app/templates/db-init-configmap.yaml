@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init-sql
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "payments-app.labels" . | nindent 4 }}
+data:
+  products.sql: |
+    CREATE TABLE IF NOT EXISTS coffees (
+      id serial PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      telesales_price DECIMAL(10,2),
+      origin VARCHAR(255),
+      quantity INT DEFAULT 0,
+      image VARCHAR(255)
+    );
+
+    CREATE TABLE IF NOT EXISTS ingredients (
+      id serial PRIMARY KEY,
+      coffee_id INT REFERENCES coffees(id),
+      name VARCHAR(255) NOT NULL,
+      quantity INT DEFAULT 0
+    );

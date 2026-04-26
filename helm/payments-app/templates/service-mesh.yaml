@@ -1,0 +1,81 @@
+{{- if eq .Values.mesh "consul" }}
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: payments-app
+  namespace: {{ .Values.namespace }}
+spec:
+  protocol: http
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: payments-processor
+  namespace: {{ .Values.namespace }}
+spec:
+  protocol: http
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: payments-app
+  namespace: {{ .Values.namespace }}
+spec:
+  destination:
+    name: payments-app
+  sources:
+    - name: api-gateway
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: payments-processor-from-app
+  namespace: {{ .Values.namespace }}
+spec:
+  destination:
+    name: payments-processor
+  sources:
+    - name: payments-app
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: payments-app-database
+  namespace: {{ .Values.namespace }}
+spec:
+  destination:
+    name: payments-app-database
+  sources:
+    - name: payments-app
+      action: allow
+{{- end }}
+{{- if eq .Values.mesh "linkerd" }}
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: payments-app
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: payments-app
+  port: 8080
+  proxyProtocol: HTTP/2
+---
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: payments-app
+  namespace: {{ .Values.namespace }}
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: payments-app
+  requiredAuthenticationRefs:
+    - name: all-authenticated
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
+{{- end }}
