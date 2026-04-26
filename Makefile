@@ -1,204 +1,127 @@
-SHELL := /bin/bash
-HELM_CHART := helm/payments-app
-STACKS_DIR := stacks
-UNITS_DIR  := units
-
+SHELL    := /bin/bash
+APP      := payments-app
+CHART    := helm/$(APP)
+STACKS   := stacks
+UNITS    := units
 TG_FLAGS := --non-interactive --backend-bootstrap
 
-# ── Stack Deploy ─────────────────────────────────────────────────
-# Usage: make stack-sops <action>   (plan / apply / destroy)
-#        make stack-vault <action>
+# ── Stack ───────────────────────────────────────────────────────
+# Usage: make stack-<name> <plan|apply|destroy>
 
-.PHONY: stack-sops
-stack-sops:
-	$(eval ACTION := $(filter plan apply destroy,$(MAKECMDGOALS)))
-	@if [ -z "$(ACTION)" ]; then echo "Usage: make stack-sops <plan|apply|destroy>"; exit 1; fi
-	cd $(STACKS_DIR)/sops-linkerd && terragrunt stack generate && terragrunt stack run $(ACTION) $(TG_FLAGS)
+STACKS_MAP := sops:sops-linkerd vault:vault-consul
 
-.PHONY: stack-vault
-stack-vault:
-	$(eval ACTION := $(filter plan apply destroy,$(MAKECMDGOALS)))
-	@if [ -z "$(ACTION)" ]; then echo "Usage: make stack-vault <plan|apply|destroy>"; exit 1; fi
-	cd $(STACKS_DIR)/vault-consul && terragrunt stack generate && terragrunt stack run $(ACTION) $(TG_FLAGS)
+define stack-rule
+.PHONY: stack-$(1)
+stack-$(1):
+	$$(eval ACTION := $$(filter plan apply destroy,$$(MAKECMDGOALS)))
+	@if [ -z "$$(ACTION)" ]; then echo "Usage: make stack-$(1) <plan|apply|destroy>"; exit 1; fi
+	cd $(STACKS)/$2 && terragrunt stack generate && terragrunt stack run $$(ACTION) $(TG_FLAGS)
+endef
+$(foreach s,$(STACKS_MAP),$(eval $(call stack-rule,$(word 1,$(subst :, ,$s)),$(word 2,$(subst :, ,$s)))))
 
-# Catch plan/apply/destroy so Make doesn't treat them as missing targets
 .PHONY: plan apply destroy
-plan apply destroy:
-	@true
+plan apply destroy: ;@:
 
-# ── Individual Unit Apply ────────────────────────────────────────
+# ── Unit ────────────────────────────────────────────────────────
+# Usage: make <apply|destroy|plan>-<unit>
 
-.PHONY: apply-vpc
-apply-vpc:
-	cd $(UNITS_DIR)/vpc && terragrunt apply
+UNIT_LIST := vpc eks kms rds vault consul argocd linkerd flagger datadog aws-alb sops-secrets
 
-.PHONY: apply-eks
-apply-eks:
-	cd $(UNITS_DIR)/eks && terragrunt apply
+define unit-rule
+.PHONY: apply-$(1) destroy-$(1) plan-$(1)
+apply-$(1)  : ; cd $(UNITS)/$(1) && terragrunt apply
+destroy-$(1): ; cd $(UNITS)/$(1) && terragrunt destroy
+plan-$(1)   : ; cd $(UNITS)/$(1) && terragrunt plan
+endef
+$(foreach u,$(UNIT_LIST),$(eval $(call unit-rule,$u)))
 
-.PHONY: apply-kms
-apply-kms:
-	cd $(UNITS_DIR)/kms && terragrunt apply
+# ── Helm ────────────────────────────────────────────────────────
+# Usage: make helm <sops|vault>         — install/upgrade
+#        make helm-template <sops|vault> — dry-run render
+#        make helm-uninstall             — remove release
 
-.PHONY: apply-rds
-apply-rds:
-	cd $(UNITS_DIR)/rds && terragrunt apply
+HELM_VALUES := sops:sops-linkerd vault:vault-consul
 
-.PHONY: apply-vault
-apply-vault:
-	cd $(UNITS_DIR)/vault && terragrunt apply
+.PHONY: helm
+helm:
+	$(eval ENV := $(filter sops vault,$(MAKECMDGOALS)))
+	@if [ -z "$(ENV)" ]; then echo "Usage: make helm <sops|vault>"; exit 1; fi
+	$(eval VFILE := $(word 2,$(subst :, ,$(filter $(ENV):%,$(HELM_VALUES)))))
+	helm upgrade --install $(APP) $(CHART) -f $(CHART)/values/$(VFILE).yaml -n $(APP) --create-namespace
 
-.PHONY: apply-consul
-apply-consul:
-	cd $(UNITS_DIR)/consul && terragrunt apply
-
-.PHONY: apply-argocd
-apply-argocd:
-	cd $(UNITS_DIR)/argocd && terragrunt apply
-
-.PHONY: apply-linkerd
-apply-linkerd:
-	cd $(UNITS_DIR)/linkerd && terragrunt apply
-
-.PHONY: apply-flagger
-apply-flagger:
-	cd $(UNITS_DIR)/flagger && terragrunt apply
-
-# ── Helm (app deploy) ───────────────────────────────────────────
-
-.PHONY: helm-sops
-helm-sops:
-	helm upgrade --install payments-app $(HELM_CHART) \
-		-f $(HELM_CHART)/values/sops-linkerd.yaml \
-		-n payments-app --create-namespace
-
-.PHONY: helm-vault
-helm-vault:
-	helm upgrade --install payments-app $(HELM_CHART) \
-		-f $(HELM_CHART)/values/vault-consul.yaml \
-		-n payments-app --create-namespace
+.PHONY: helm-template
+helm-template:
+	$(eval ENV := $(filter sops vault,$(MAKECMDGOALS)))
+	@if [ -z "$(ENV)" ]; then echo "Usage: make helm-template <sops|vault>"; exit 1; fi
+	$(eval VFILE := $(word 2,$(subst :, ,$(filter $(ENV):%,$(HELM_VALUES)))))
+	helm template $(APP) $(CHART) -f $(CHART)/values/$(VFILE).yaml
 
 .PHONY: helm-uninstall
 helm-uninstall:
-	helm uninstall payments-app -n payments-app
+	helm uninstall $(APP) -n $(APP)
 
-.PHONY: helm-template-sops
-helm-template-sops:
-	helm template payments-app $(HELM_CHART) -f $(HELM_CHART)/values/sops-linkerd.yaml
+.PHONY: sops vault
+sops vault: ;@:
 
-.PHONY: helm-template-vault
-helm-template-vault:
-	helm template payments-app $(HELM_CHART) -f $(HELM_CHART)/values/vault-consul.yaml
-
-# ── Kubeconfig + Env ─────────────────────────────────────────────
+# ── Kubernetes ──────────────────────────────────────────────────
 
 .PHONY: kubeconfig
 kubeconfig:
-	aws eks --region $$(cd $(UNITS_DIR)/vpc && terragrunt output -raw region) \
-		update-kubeconfig \
-		--name $$(cd $(UNITS_DIR)/eks && terragrunt output -raw cluster_name)
+	aws eks --region $$(cd $(UNITS)/vpc && terragrunt output -raw region) \
+		update-kubeconfig --name $$(cd $(UNITS)/eks && terragrunt output -raw cluster_name)
 
-.PHONY: set-env
-set-env:
-	@echo "Run: source set_env.sh"
+.PHONY: argocd-password argocd-sync argocd-apps
+argocd-password:
+	@kubectl get secrets -n argocd argocd-initial-admin-secret \
+		-o jsonpath="{.data.password}" | base64 -d && echo
+argocd-sync: ; argocd app sync $(APP)
+argocd-apps: ; argocd app list
 
-# ── Vault Operations (vault-consul env) ─────────────────────────
+# ── Vault / Consul ──────────────────────────────────────────────
 
-.PHONY: vault-status
-vault-status:
-	vault status
+.PHONY: vault-status vault-db-creds vault-pki-roots vault-lease-clean
+vault-status:     ; vault status
+vault-db-creds:   ; vault read $(APP)/database/creds/payments
+vault-pki-roots:  ; vault read consul/server/pki/cert/ca_chain
+vault-lease-clean:; vault lease revoke --force --prefix $(APP)/database
 
-.PHONY: vault-db-creds
-vault-db-creds:
-	vault read payments-app/database/creds/payments
-
-.PHONY: vault-pki-roots
-vault-pki-roots:
-	vault read consul/server/pki/cert/ca_chain
-
-.PHONY: vault-lease-clean
-vault-lease-clean:
-	vault lease revoke --force --prefix payments-app/database
-
-# ── Consul Operations (vault-consul env) ────────────────────────
-
-.PHONY: consul-members
-consul-members:
-	consul members
-
-.PHONY: consul-intentions
-consul-intentions:
-	consul intention list
-
-.PHONY: consul-ca-roots
+.PHONY: consul-members consul-intentions consul-ca-roots
+consul-members:   ; consul members
+consul-intentions:; consul intention list
 consul-ca-roots:
 	curl -sk -H "X-Consul-Token:$${CONSUL_HTTP_TOKEN}" \
 		$${CONSUL_HTTP_ADDR}/v1/connect/ca/roots | jq .
 
-# ── ArgoCD ───────────────────────────────────────────────────────
+# ── Test ────────────────────────────────────────────────────────
 
-.PHONY: argocd-password
-argocd-password:
-	@kubectl get secrets -n argocd argocd-initial-admin-secret \
-		-o jsonpath="{.data.password}" | base64 -d && echo
-
-.PHONY: argocd-sync
-argocd-sync:
-	argocd app sync payments-app
-
-.PHONY: argocd-apps
-argocd-apps:
-	argocd app list
-
-# ── Test / Verify ────────────────────────────────────────────────
-
-.PHONY: test-app
+.PHONY: test-app test-db test-mesh
 test-app:
-	@echo "Testing payments-app endpoint..."
-	curl -sk $$(kubectl get svc -n payments-app payments-app \
+	curl -sk $$(kubectl get svc -n $(APP) $(APP) \
 		-o jsonpath='{.status.loadBalancer.ingress[0].hostname}'):8081/payments
-
-.PHONY: test-db
 test-db:
-	@echo "Testing PostgreSQL connection..."
-	pg_isready -h $$(cd $(UNITS_DIR)/rds && terragrunt output -raw rds_endpoint) -p 5432
-
-.PHONY: test-mesh
+	pg_isready -h $$(cd $(UNITS)/rds && terragrunt output -raw rds_endpoint) -p 5432
 test-mesh:
-	@echo "Checking mTLS proxy status..."
-	kubectl exec -n payments-app deploy/payments-app -c linkerd-proxy -- \
+	kubectl exec -n $(APP) deploy/$(APP) -c linkerd-proxy -- \
 		/usr/lib/linkerd/linkerd-identity-end-entity 2>/dev/null || \
-	kubectl exec -n payments-app deploy/payments-app -c envoy-sidecar -- \
+	kubectl exec -n $(APP) deploy/$(APP) -c envoy-sidecar -- \
 		curl -s localhost:19000/certs 2>/dev/null || \
 	echo "No mesh sidecar found"
 
-# ── Cleanup ──────────────────────────────────────────────────────
+# ── Cleanup ─────────────────────────────────────────────────────
 
-.PHONY: clean-app
+.PHONY: clean-app clean-helm clean-all
 clean-app:
-	kubectl patch app payments-app -n argocd \
-		-p '{"metadata": {"finalizers": ["resources-finalizer.argocd.argoproj.io"]}}' --type merge
-	kubectl delete app payments-app -n argocd
-
-.PHONY: clean-helm
-clean-helm:
-	helm uninstall payments-app -n payments-app || true
-
-.PHONY: clean-all
+	kubectl patch app $(APP) -n argocd \
+		-p '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}' --type merge
+	kubectl delete app $(APP) -n argocd
+clean-helm: ; helm uninstall $(APP) -n $(APP) || true
 clean-all: clean-helm
-	cd $(STACKS_DIR)/sops-linkerd && terragrunt stack run destroy $(TG_FLAGS) || true
-	cd $(STACKS_DIR)/vault-consul && terragrunt stack run destroy $(TG_FLAGS) || true
+	cd $(STACKS)/sops-linkerd  && terragrunt stack run destroy $(TG_FLAGS) || true
+	cd $(STACKS)/vault-consul && terragrunt stack run destroy $(TG_FLAGS) || true
 
-# ── Utility ──────────────────────────────────────────────────────
+# ── Utility ─────────────────────────────────────────────────────
 
-.PHONY: fmt
-fmt:
-	terraform fmt -recursive $(UNITS_DIR)
-
-.PHONY: graph
-graph:
-	cd $(STACKS_DIR)/vault-consul && terragrunt graph-dependencies
-
-.PHONY: graph-sops
-graph-sops:
-	cd $(STACKS_DIR)/sops-linkerd && terragrunt graph-dependencies
+.PHONY: fmt graph-sops graph-vault
+fmt:        ; terraform fmt -recursive $(UNITS)
+graph-sops: ; cd $(STACKS)/sops-linkerd  && terragrunt graph-dependencies
+graph-vault:; cd $(STACKS)/vault-consul && terragrunt graph-dependencies
