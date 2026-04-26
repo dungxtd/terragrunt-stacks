@@ -1,0 +1,39 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terragrunt
+.terragrunt-cache/
+.terragrunt-stack/
+terragrunt-debug.tfvars.json
+
+# SOPS / secrets
+*.dec
+*.decrypted
+*.sops.yaml.dec
+secrets.yaml
+secrets.json
+
+# Local env files
+set_env_local.sh
+*.local.hcl
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

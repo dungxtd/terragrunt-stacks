@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-app
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: payments-app
+    {{- include "payments-app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.paymentsApp.replicas }}
+  selector:
+    matchLabels:
+      app: payments-app
+  template:
+    metadata:
+      labels:
+        app: payments-app
+      annotations:
+        {{- if eq .Values.mesh "linkerd" }}
+        linkerd.io/inject: enabled
+        {{- end }}
+        {{- if eq .Values.mesh "consul" }}
+        consul.hashicorp.com/connect-inject: "true"
+        consul.hashicorp.com/connect-service-upstreams: "payments-processor:9090,payments-app-database:5432"
+        {{- end }}
+        {{- if eq .Values.secrets "vault" }}
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "payments"
+        vault.hashicorp.com/agent-inject-secret-db-creds: "payments-app/database/creds/payments"
+        vault.hashicorp.com/agent-inject-template-db-creds: |
+          {{`{{- with secret "payments-app/database/creds/payments" -}}
+          postgresql://{{ .Data.username }}:{{ .Data.password }}@payments-app-database:5432/payments?sslmode=disable
+          {{- end }}`}}
+        {{- end }}
+    spec:
+      serviceAccountName: payments-app
+      containers:
+        - name: payments-app
+          image: {{ .Values.paymentsApp.image }}
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: NAME
+              value: "payments-app"
+            {{- if eq .Values.secrets "vault" }}
+            - name: VAULT_ADDR
+              value: {{ .Values.vault.address | quote }}
+            - name: DB_CONNECTION
+              value: "/vault/secrets/db-creds"
+            {{- end }}
+            {{- if eq .Values.secrets "sops" }}
+            - name: DB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: payments-app-db-creds
+                  key: connection_string
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
