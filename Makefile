@@ -225,6 +225,7 @@ ms-teardown: ms-disable ms-down
 tg-clean:
 	@echo "Clearing terragrunt cache..."
 	@find $(UNITS) $(STACKS) -name ".terragrunt-cache" -type d -exec rm -rf {} + 2>/dev/null || true
+	@find $(UNITS) $(STACKS) -name ".terragrunt-stack" -type d -exec rm -rf {} + 2>/dev/null || true
 	@find $(UNITS) $(STACKS) -name ".terraform" -type d -exec rm -rf {} + 2>/dev/null || true
 	@find $(UNITS) $(STACKS) -name ".terraform.lock.hcl" -type f -delete 2>/dev/null || true
 	@echo "✓ Cache cleared"
