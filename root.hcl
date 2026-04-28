@@ -10,6 +10,7 @@ locals {
   ministack_access   = local.local_cfg.locals.ministack_access_key
   ministack_secret   = local.local_cfg.locals.ministack_secret_key
 
+  # ── Provider: AWS ────────────────────────────────────────────
   provider_aws = <<-EOF
     provider "aws" {
       region = "${local.region}"
@@ -23,6 +24,7 @@ locals {
     }
   EOF
 
+  # ── Provider: MiniStack ──────────────────────────────────────
   provider_ministack = <<-EOF
     provider "aws" {
       region     = "${local.region}"
@@ -62,6 +64,36 @@ locals {
       }
     }
   EOF
+
+  # ── Remote state: AWS ────────────────────────────────────────
+  backend_aws = {
+    bucket         = "tf-state-${local.project}-${local.region}"
+    key            = "${path_relative_to_include()}/terraform.tfstate"
+    region         = local.region
+    dynamodb_table = "tf-state-lock"
+    encrypt        = true
+  }
+
+  # ── Remote state: MiniStack ──────────────────────────────────
+  backend_ministack = {
+    bucket                      = "tf-state-${local.project}-${local.region}"
+    key                         = "${path_relative_to_include()}/terraform.tfstate"
+    region                      = local.region
+    dynamodb_table              = "tf-state-lock"
+    encrypt                     = false
+    access_key                  = local.ministack_access
+    secret_key                  = local.ministack_secret
+    endpoint                    = local.ministack_endpoint
+    dynamodb_endpoint           = local.ministack_endpoint
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_requesting_account_id  = true
+    force_path_style            = true
+    skip_bucket_versioning      = true
+    skip_bucket_ssencryption    = true
+    skip_bucket_root_access     = true
+    skip_bucket_enforced_tls    = true
+  }
 }
 
 generate "versions" {
@@ -109,25 +141,7 @@ remote_state {
     path      = "backend.tf"
     if_exists = "overwrite_terragrunt"
   }
-  config = merge(
-    {
-      bucket         = "tf-state-${local.project}-${local.region}"
-      key            = "${path_relative_to_include()}/terraform.tfstate"
-      region         = local.region
-      dynamodb_table = "tf-state-lock"
-      encrypt        = true
-    },
-    local.use_ministack ? {
-      access_key                  = local.ministack_access
-      secret_key                  = local.ministack_secret
-      endpoint                    = local.ministack_endpoint
-      dynamodb_endpoint           = local.ministack_endpoint
-      skip_credentials_validation = true
-      skip_metadata_api_check     = true
-      skip_requesting_account_id  = true
-      force_path_style            = true
-    } : {}
-  )
+  config = local.use_ministack ? local.backend_ministack : local.backend_aws
 }
 
 terraform {
