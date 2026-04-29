@@ -29,16 +29,20 @@ locals {
   _local_cfg     = read_terragrunt_config("${get_repo_root()}/local.hcl")
   _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._local_cfg.locals.active_env}.hcl")
   _use_ministack = local._env_cfg.locals.use_ministack
+
+  _kubernetes_ca_cert         = base64decode(dependency.eks.outputs.cluster_certificate_authority_data)
+  _rds_password               = get_env("RDS_MASTER_PASSWORD", "")
+  _payments_processor_password = get_env("PAYMENTS_PROCESSOR_PASSWORD", "")
 }
 
 inputs = {
   use_ministack      = local._use_ministack
   vault_address      = dependency.vault.outputs.vault_address
   kubernetes_host    = dependency.eks.outputs.cluster_endpoint
-  kubernetes_ca_cert = base64decode(dependency.eks.outputs.cluster_certificate_authority_data)
+  kubernetes_ca_cert = local._kubernetes_ca_cert
   rds_endpoint       = dependency.rds.outputs.rds_endpoint
   rds_username       = dependency.rds.outputs.rds_username
-  rds_password       = get_env("RDS_MASTER_PASSWORD", "")
+  rds_password       = local._rds_password
 
-  payments_processor_password = get_env("PAYMENTS_PROCESSOR_PASSWORD", "changeme")
+  payments_processor_password = local._payments_processor_password
 }
