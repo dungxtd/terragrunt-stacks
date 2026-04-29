@@ -1,5 +1,5 @@
 output "vault_address" {
-  description = "Vault internal cluster address"
+  description = "Vault cluster-internal address"
   value       = "http://vault.vault.svc.cluster.local:8200"
 }
 

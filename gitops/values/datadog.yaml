@@ -1,0 +1,16 @@
+datadog:
+  site: datadoghq.com
+  logs:
+    enabled: true
+    containerCollectAll: true
+  apm:
+    enabled: true
+  processAgent:
+    enabled: true
+  kubelet:
+    tlsVerify: false
+
+clusterAgent:
+  enabled: true
+  metricsProvider:
+    enabled: true

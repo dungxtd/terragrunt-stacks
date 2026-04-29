@@ -27,7 +27,7 @@ resource "helm_release" "argocd" {
   values = [yamlencode({
     server = {
       service = {
-        type = "LoadBalancer"
+        type = var.use_ministack ? "NodePort" : "LoadBalancer"
       }
       additionalProjects = [for p in local.app_projects : {
         name        = p.name

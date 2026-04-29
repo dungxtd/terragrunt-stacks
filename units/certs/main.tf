@@ -1,8 +1,3 @@
-provider "vault" {
-  address = var.vault_address
-  token   = var.vault_token
-}
-
 # ── Offline Root CA ──────────────────────────────────────────────
 
 resource "tls_private_key" "root_ca" {

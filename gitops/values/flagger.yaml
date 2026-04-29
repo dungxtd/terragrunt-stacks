@@ -1,0 +1,12 @@
+meshProvider: consul
+metricsServer: http://prometheus-server.default:9090
+
+podMonitor:
+  enabled: false
+
+prometheus:
+  install: false
+
+slack:
+  url: ""
+  channel: ""

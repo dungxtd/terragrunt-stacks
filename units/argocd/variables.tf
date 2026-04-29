@@ -4,6 +4,12 @@ variable "enable_consul_project" {
   default     = false
 }
 
+variable "use_ministack" {
+  description = "Running against MiniStack — use NodePort instead of LoadBalancer"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Common tags"
   type        = map(string)

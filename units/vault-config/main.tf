@@ -1,7 +1,3 @@
-provider "vault" {
-  address = var.vault_address
-}
-
 # ── Kubernetes Auth Backend ──────────────────────────────────────
 
 resource "vault_auth_backend" "kubernetes" {
@@ -28,6 +24,13 @@ resource "vault_transit_secret_backend_key" "payments" {
 
 # ── Database Secrets Engine ──────────────────────────────────────
 
+locals {
+  # MiniStack: Vault (k3s) reaches the real PG container via host.docker.internal
+  db_endpoint = var.use_ministack ? "host.docker.internal:15432" : var.rds_endpoint
+  db_username = var.use_ministack ? "postgres" : var.rds_username
+  db_password = var.use_ministack ? "password" : var.rds_password
+}
+
 resource "vault_mount" "database" {
   path = "payments-app/database"
   type = "database"
@@ -39,9 +42,9 @@ resource "vault_database_secret_backend_connection" "postgres" {
   allowed_roles = ["payments"]
 
   postgresql {
-    connection_url = "postgresql://{{username}}:{{password}}@${var.rds_endpoint}/payments"
-    username       = var.rds_username
-    password       = var.rds_password
+    connection_url = "postgresql://{{username}}:{{password}}@${local.db_endpoint}/payments"
+    username       = local.db_username
+    password       = local.db_password
   }
 }
 
@@ -60,8 +63,8 @@ resource "vault_database_secret_backend_role" "payments" {
     "DROP ROLE IF EXISTS \"{{name}}\";",
   ]
 
-  default_ttl = "1h"
-  max_ttl     = "24h"
+  default_ttl = 3600
+  max_ttl     = 86400
 }
 
 # ── KV v2 for payments-processor static creds ────────────────────
