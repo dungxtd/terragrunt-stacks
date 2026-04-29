@@ -40,10 +40,10 @@ dependency "rds" {
 }
 
 locals {
-  _env_name                = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
-  _env_cfg                 = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
-  _use_ministack           = local._env_cfg.locals.use_ministack
-  _rds_password            = get_env("RDS_MASTER_PASSWORD", "")
+  _env_name                    = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
+  _env_cfg                     = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
+  _use_ministack               = local._env_cfg.locals.use_ministack
+  _rds_password                = get_env("RDS_MASTER_PASSWORD", "")
   _payments_processor_password = get_env("PAYMENTS_PROCESSOR_PASSWORD", "")
 }
 
