@@ -242,7 +242,8 @@ ms-bootstrap: tg-clean ms-reset ms-seed
 	@cd $(STACKS)/vault-consul && terragrunt stack generate && terragrunt stack run apply $(TG_FLAGS)
 	@echo ""
 	@echo "═══ Bootstrapping GitOps… ═══"
-	@KUBECONFIG=$(shell pwd)/.kubeconfig-ministack kubectl apply -f $(GITOPS_DIR)/appset.yaml 2>/dev/null || true
+	@KUBECONFIG=$(shell pwd)/.kubeconfig-ministack kubectl apply -f $(GITOPS_DIR)/appset.yaml || true
+	@KUBECONFIG=$(shell pwd)/.kubeconfig-ministack kubectl get applications -n argocd 2>/dev/null || true
 	@lsof -ti :18200 | xargs kill 2>/dev/null || true
 	@echo ""
 	@echo "══════════════════════════════════════════════════"
