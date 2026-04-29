@@ -8,10 +8,10 @@
 #   local dev               → localhost via port-forward or NodePort
 
 locals {
-  _env_name      = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
-  _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
-  _kubeconfig    = local._env_cfg.locals.kubeconfig_path
-  _vault_port    = 18200
+  _env_name   = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
+  _env_cfg    = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
+  _kubeconfig = local._env_cfg.locals.kubeconfig_path
+  _vault_port = 18200
 
   # Both local dev and CI reach Vault via port-forward on localhost
   _vault_address = "http://localhost:${local._vault_port}"

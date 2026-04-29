@@ -50,7 +50,7 @@ locals {
   vault_mode      = "ha"
   dev_root_token  = ""
   ssm_endpoint    = ""
-  vault_token_cmd = "aws ssm get-parameter --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text"
+  vault_token_cmd = "aws ssm get-parameter --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text 2>/dev/null || echo 'VAULT_TOKEN_NOT_YET_AVAILABLE'"
 
   # ArgoCD
   argocd_service_type = "LoadBalancer"

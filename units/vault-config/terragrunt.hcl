@@ -41,10 +41,11 @@ inputs = {
   kubernetes_host    = dependency.eks.outputs.cluster_endpoint
   kubernetes_ca_cert = base64decode(dependency.eks.outputs.cluster_certificate_authority_data)
 
-  # Env config provides overrides; empty string → fall back to real RDS outputs
-  rds_endpoint = coalesce(local._env_cfg.locals.rds_endpoint_override, dependency.rds.outputs.rds_endpoint)
-  rds_username = coalesce(local._env_cfg.locals.rds_username_override, dependency.rds.outputs.rds_username)
-  rds_password = coalesce(local._env_cfg.locals.rds_password_override, local._rds_password)
+  # Env config provides overrides; empty string → fall back to real RDS outputs.
+  # Final fallback prevents coalesce error when all args are empty (first deploy).
+  rds_endpoint = coalesce(local._env_cfg.locals.rds_endpoint_override, dependency.rds.outputs.rds_endpoint, "NOT_YET_DEPLOYED")
+  rds_username = coalesce(local._env_cfg.locals.rds_username_override, dependency.rds.outputs.rds_username, "NOT_YET_DEPLOYED")
+  rds_password = coalesce(local._env_cfg.locals.rds_password_override, local._rds_password, "NOT_YET_DEPLOYED")
 
   payments_processor_password = local._payments_processor_password
 }
