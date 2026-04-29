@@ -70,7 +70,7 @@ locals {
 
   # ── Remote state: AWS ────────────────────────────────────────
   backend_aws = {
-    bucket         = "tf-state-${local.project}-${local.region}"
+    bucket         = "tf-state-terragrunt-stacks"
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = local.region
     dynamodb_table = "tf-state-lock"
