@@ -8,8 +8,8 @@ resource "helm_release" "linkerd_crds" {
 }
 
 resource "tls_private_key" "trust_anchor" {
-  count     = var.external_ca ? 0 : 1
-  algorithm = "ECDSA"
+  count       = var.external_ca ? 0 : 1
+  algorithm   = "ECDSA"
   ecdsa_curve = "P256"
 }
 
@@ -31,8 +31,8 @@ resource "tls_self_signed_cert" "trust_anchor" {
 }
 
 resource "tls_private_key" "issuer" {
-  count     = var.external_ca ? 0 : 1
-  algorithm = "ECDSA"
+  count       = var.external_ca ? 0 : 1
+  algorithm   = "ECDSA"
   ecdsa_curve = "P256"
 }
 
