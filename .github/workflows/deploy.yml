@@ -1,0 +1,262 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write   # OIDC token for AWS auth
+  contents: read
+  pull-requests: write
+
+env:
+  AWS_REGION: ap-southeast-1
+  TF_VERSION: "1.10.5"
+  TG_VERSION: "0.77.16"
+  TG_FLAGS: --non-interactive --backend-bootstrap
+  STATE_BUCKET: tf-state-terragrunt-infra-ap-southeast-1
+  STATE_PREFIX: stacks/vault-consul
+  STATE_UNITS: vpc eks kms rds vault certs vault-config linkerd argocd github-runner
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64" \
+            -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+
+      - name: Ensure AWS env active
+        run: make ms-disable
+
+      - name: Check HCL formatting
+        run: terragrunt hclfmt --terragrunt-check --terragrunt-diff
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Generate stack
+        working-directory: stacks/vault-consul
+        run: terragrunt stack generate
+
+      - name: Validate all units
+        run: |
+          failed=0
+          for unit in units/*/; do
+            unit_name=$(basename "$unit")
+            echo "── validating $unit_name"
+            (cd "$unit" && terragrunt validate --terragrunt-no-auto-init 2>&1) || {
+              echo "✗ $unit_name failed validate"
+              failed=1
+            }
+          done
+          exit $failed
+
+      - name: Policy as code (Checkov)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: units
+          framework: terraform
+          output_format: cli
+          soft_fail: false
+          skip_check: CKV_AWS_144,CKV_AWS_18
+
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      exitcode: ${{ steps.plan.outputs.exitcode }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64" \
+            -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+
+      - name: Ensure AWS env active
+        run: make ms-disable
+
+      - name: IAM policy simulation
+        run: |
+          ROLE_ARN=$(aws sts get-caller-identity --query Arn --output text)
+          DENIED=$(aws iam simulate-principal-policy \
+            --policy-source-arn "$ROLE_ARN" \
+            --action-names \
+              eks:CreateCluster eks:DescribeCluster \
+              rds:CreateDBInstance rds:DescribeDBInstances \
+              kms:CreateKey kms:DescribeKey \
+              iam:PassRole iam:CreateRole \
+              secretsmanager:CreateSecret \
+              ec2:CreateVpc ec2:DescribeVpcs \
+            --query 'EvaluationResults[?EvalDecision!=`allowed`].EvalActionName' \
+            --output text)
+          if [ -n "$DENIED" ]; then
+            echo "IAM denies: $DENIED"
+            exit 1
+          fi
+          echo "IAM OK"
+
+      - name: Terragrunt plan
+        id: plan
+        working-directory: stacks/vault-consul
+        env:
+          GITHUB_CONFIG_URL: ${{ secrets.GITHUB_CONFIG_URL }}
+          GITHUB_APP_ID: ${{ secrets.ARC_APP_ID }}
+          GITHUB_APP_INSTALLATION_ID: ${{ secrets.ARC_APP_INSTALLATION_ID }}
+          GITHUB_APP_PRIVATE_KEY: ${{ secrets.ARC_APP_PRIVATE_KEY }}
+        run: |
+          terragrunt stack generate
+          terragrunt stack run plan ${{ env.TG_FLAGS }} -detailed-exitcode 2>&1 | tee plan.log
+          exitcode=${PIPESTATUS[0]}
+          # 0 = no changes, 1 = error, 2 = changes pending
+          echo "exitcode=$exitcode" >> "$GITHUB_OUTPUT"
+          [ "$exitcode" -eq 1 ] && exit 1 || exit 0
+
+      - name: Post plan to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.readFileSync('stacks/vault-consul/plan.log', 'utf8');
+            const truncated = log.length > 60000 ? '...(truncated)\n' + log.slice(-60000) : log;
+            const body = `### Terragrunt Plan\n\`\`\`\n${truncated}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+  apply:
+    name: Apply
+    runs-on: arc-runner
+    needs: plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64" \
+            -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+
+      - name: Ensure AWS env active
+        run: make ms-disable
+
+      - name: Pre-apply readiness checks
+        run: |
+          failed=0
+
+          # EKS cluster ACTIVE (skip if cluster doesn't exist yet on first deploy)
+          CLUSTER_NAME=$(cd units/eks && terragrunt output -raw cluster_name 2>/dev/null || echo "")
+          if [ -n "$CLUSTER_NAME" ]; then
+            STATUS=$(aws eks describe-cluster --name "$CLUSTER_NAME" \
+              --query 'cluster.status' --output text 2>/dev/null || echo "NOT_FOUND")
+            [ "$STATUS" = "ACTIVE" ] || { echo "EKS not ACTIVE (got: $STATUS)"; failed=1; }
+          fi
+
+          # RDS available (skip if not yet created)
+          RDS_ID=$(cd units/rds && terragrunt output -raw rds_endpoint 2>/dev/null | cut -d: -f1 || echo "")
+          if [ -n "$RDS_ID" ]; then
+            STATUS=$(aws rds describe-db-instances \
+              --db-instance-identifier "$RDS_ID" \
+              --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || echo "not-found")
+            [ "$STATUS" = "available" ] || { echo "RDS not available (got: $STATUS)"; failed=1; }
+          fi
+
+          # No state lock held
+          LOCK=$(aws dynamodb get-item \
+            --table-name tf-state-lock \
+            --key "{\"LockID\":{\"S\":\"${{ env.STATE_BUCKET }}/${{ env.STATE_PREFIX }}/terraform.tfstate\"}}" \
+            --query 'Item' --output text 2>/dev/null)
+          [ -z "$LOCK" ] || { echo "State lock held: $LOCK"; failed=1; }
+
+          exit $failed
+
+      - name: Snapshot state before apply
+        id: snapshot
+        run: |
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "SNAPSHOT_TS=$TIMESTAMP" >> "$GITHUB_ENV"
+          for unit in ${{ env.STATE_UNITS }}; do
+            aws s3 cp \
+              "s3://${{ env.STATE_BUCKET }}/${{ env.STATE_PREFIX }}/${unit}/terraform.tfstate" \
+              "s3://${{ env.STATE_BUCKET }}/backups/${TIMESTAMP}/${unit}/terraform.tfstate" \
+              2>/dev/null || true
+          done
+          echo "Snapshot saved: backups/$TIMESTAMP"
+
+      - name: Terragrunt apply
+        id: apply
+        working-directory: stacks/vault-consul
+        env:
+          GITHUB_CONFIG_URL: ${{ secrets.GITHUB_CONFIG_URL }}
+          GITHUB_APP_ID: ${{ secrets.ARC_APP_ID }}
+          GITHUB_APP_INSTALLATION_ID: ${{ secrets.ARC_APP_INSTALLATION_ID }}
+          GITHUB_APP_PRIVATE_KEY: ${{ secrets.ARC_APP_PRIVATE_KEY }}
+        run: |
+          terragrunt stack generate
+          terragrunt stack run apply ${{ env.TG_FLAGS }}
+
+      - name: Rollback state on apply failure
+        if: failure() && steps.apply.outcome == 'failure'
+        run: |
+          echo "Apply failed — restoring state from snapshot ${{ env.SNAPSHOT_TS }}"
+          for unit in ${{ env.STATE_UNITS }}; do
+            aws s3 cp \
+              "s3://${{ env.STATE_BUCKET }}/backups/${{ env.SNAPSHOT_TS }}/${unit}/terraform.tfstate" \
+              "s3://${{ env.STATE_BUCKET }}/${{ env.STATE_PREFIX }}/${unit}/terraform.tfstate" \
+              2>/dev/null && echo "✓ $unit restored" || echo "⚠ $unit had no snapshot (not yet deployed)"
+          done
+          echo ""
+          echo "State restored. AWS resources already created still exist — review manually."
+          exit 1
