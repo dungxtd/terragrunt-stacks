@@ -1,0 +1,22 @@
+services:
+  ministack:
+    image: ministackorg/ministack:latest
+    container_name: ministack
+    privileged: true
+    entrypoint: /patches/entrypoint.sh
+    ports:
+      - "4566:4566"
+    environment:
+      - MINISTACK_REGION=${AWS_REGION:-ap-southeast-1}
+      - DOCKER_NETWORK=terragrunt_default
+      - LOG_LEVEL=INFO
+      # - EKS_K3S_VERSION=v1.31.4-k3s1  # uncomment to pin k3s version
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./patches/entrypoint.sh:/patches/entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s

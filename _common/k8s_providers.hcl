@@ -1,5 +1,17 @@
 # Shared k8s provider config for units that deploy to EKS.
 # Units that include this file must NOT define their own dependency "eks".
+#
+# Auth strategy:
+#   ministack → config_path = <repo>/.kubeconfig-ministack  (run: make ms-kubeconfig)
+#   aws       → config_path = ~/.kube/config                (run: make kubeconfig)
+
+locals {
+  _local_cfg     = read_terragrunt_config("${get_repo_root()}/local.hcl")
+  _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._local_cfg.locals.active_env}.hcl")
+  _use_ministack = local._env_cfg.locals.use_ministack
+
+  _kubeconfig_path = local._use_ministack ? "${get_repo_root()}/.kubeconfig-ministack" : "~/.kube/config"
+}
 
 dependency "eks" {
   config_path = "../eks"
@@ -18,24 +30,12 @@ generate "k8s_providers" {
   contents  = <<-EOF
     provider "helm" {
       kubernetes {
-        host                   = "${dependency.eks.outputs.cluster_endpoint}"
-        cluster_ca_certificate = base64decode("${dependency.eks.outputs.cluster_certificate_authority_data}")
-        exec {
-          api_version = "client.authentication.k8s.io/v1beta1"
-          command     = "aws"
-          args        = ["eks", "get-token", "--cluster-name", "${dependency.eks.outputs.cluster_name}"]
-        }
+        config_path = "${local._kubeconfig_path}"
       }
     }
 
     provider "kubernetes" {
-      host                   = "${dependency.eks.outputs.cluster_endpoint}"
-      cluster_ca_certificate = base64decode("${dependency.eks.outputs.cluster_certificate_authority_data}")
-      exec {
-        api_version = "client.authentication.k8s.io/v1beta1"
-        command     = "aws"
-        args        = ["eks", "get-token", "--cluster-name", "${dependency.eks.outputs.cluster_name}"]
-      }
+      config_path = "${local._kubeconfig_path}"
     }
   EOF
 }

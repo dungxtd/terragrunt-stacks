@@ -27,9 +27,9 @@ module "rds" {
   deletion_protection     = var.deletion_protection
   skip_final_snapshot     = true
 
-  performance_insights_enabled = true
-  monitoring_interval          = 60
-  create_monitoring_role       = true
+  performance_insights_enabled = var.performance_insights
+  monitoring_interval          = var.monitoring_interval
+  create_monitoring_role       = var.create_monitoring_role
   monitoring_role_name         = "${var.project}-rds-monitoring"
 
   parameters = [

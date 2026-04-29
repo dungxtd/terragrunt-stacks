@@ -1,14 +1,16 @@
 locals {
   common    = read_terragrunt_config("${get_repo_root()}/common.hcl")
   local_cfg = read_terragrunt_config("${get_repo_root()}/local.hcl")
+  env_cfg   = read_terragrunt_config("${get_repo_root()}/envs/${local.local_cfg.locals.active_env}.hcl")
 
   project = local.common.locals.project
   region  = local.common.locals.region
 
-  use_ministack      = local.local_cfg.locals.use_ministack
-  ministack_endpoint = local.local_cfg.locals.ministack_endpoint
-  ministack_access   = local.local_cfg.locals.ministack_access_key
-  ministack_secret   = local.local_cfg.locals.ministack_secret_key
+  # Resolved from envs/<active_env>.hcl
+  use_ministack      = local.env_cfg.locals.use_ministack
+  ministack_endpoint = local.env_cfg.locals.endpoint
+  ministack_access   = local.env_cfg.locals.access_key
+  ministack_secret   = local.env_cfg.locals.secret_key
 
   # ── Provider: AWS ────────────────────────────────────────────
   provider_aws = <<-EOF
@@ -45,6 +47,7 @@ locals {
 
       endpoints {
         acm            = "${local.ministack_endpoint}"
+        cloudwatchlogs = "${local.ministack_endpoint}"
         dynamodb       = "${local.ministack_endpoint}"
         ec2            = "${local.ministack_endpoint}"
         ecr            = "${local.ministack_endpoint}"
