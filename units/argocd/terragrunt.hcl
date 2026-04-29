@@ -7,7 +7,11 @@ include "k8s" {
   expose = true
 }
 
-inputs = {
+locals {
   enable_consul_project = try(values.enable_consul_project, false)
+}
+
+inputs = {
+  enable_consul_project = local.enable_consul_project
   use_ministack         = include.k8s.locals._use_ministack
 }
