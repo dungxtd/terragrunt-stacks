@@ -28,6 +28,7 @@ set_env_local.sh
 *.local.hcl
 .env
 .env.*
+.kubeconfig-ministack
 
 # macOS
 .DS_Store

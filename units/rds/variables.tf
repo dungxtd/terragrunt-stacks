@@ -36,6 +36,24 @@ variable "deletion_protection" {
   default     = true
 }
 
+variable "performance_insights" {
+  description = "Enable Performance Insights"
+  type        = bool
+  default     = true
+}
+
+variable "monitoring_interval" {
+  description = "Enhanced Monitoring interval in seconds (0 to disable)"
+  type        = number
+  default     = 60
+}
+
+variable "create_monitoring_role" {
+  description = "Create IAM role for Enhanced Monitoring"
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Common tags"
   type        = map(string)

@@ -19,6 +19,18 @@ variable "azs" {
   type        = list(string)
 }
 
+variable "enable_nat_gateway" {
+  description = "Enable NAT Gateways"
+  type        = bool
+  default     = true
+}
+
+variable "single_nat_gateway" {
+  description = "Use a single NAT Gateway (cost savings)"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Common tags"
   type        = map(string)

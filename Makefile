@@ -121,53 +121,36 @@ clean-all: clean-helm
 
 # ── MiniStack ──────────────────────────────────────────────
 
-MINISTACK_IMAGE   := ministackorg/ministack:latest
-MINISTACK_NAME    := ministack
-MINISTACK_PORT    := 4566
-MINISTACK_EP      := http://localhost:$(MINISTACK_PORT)
-LOCAL_HCL         := local.hcl
-STATE_BUCKET      := tf-state-$(APP)-us-east-1
+MINISTACK_NAME          := ministack
+MINISTACK_PORT          := 4566
+MINISTACK_EP            := http://localhost:$(MINISTACK_PORT)
+LOCAL_HCL               := local.hcl
+STATE_BUCKET            := tf-state-$(APP)-us-east-1
+MINISTACK_EKS_CONTAINER := ministack-eks-terragrunt-infra-eks
+MINISTACK_KUBECONFIG    := .kubeconfig-ministack
 
 .PHONY: ms-up
 ms-up:
-	@if docker ps --format '{{.Names}}' | grep -q '^$(MINISTACK_NAME)$$'; then \
-		echo "✓ MiniStack is already running"; \
-	else \
-		echo "Starting MiniStack..."; \
-		docker run -d --name $(MINISTACK_NAME) \
-			-p $(MINISTACK_PORT):4566 \
-			-v /var/run/docker.sock:/var/run/docker.sock \
-			-u root \
-			$(MINISTACK_IMAGE); \
-		echo "Waiting for MiniStack to be ready..."; \
-		for i in $$(seq 1 30); do \
-			if curl -sf $(MINISTACK_EP)/_ministack/health > /dev/null 2>&1; then \
-				echo "✓ MiniStack is ready"; \
-				break; \
-			fi; \
-			sleep 1; \
-		done; \
-	fi
+	@docker compose up -d --wait
+	@echo "✓ MiniStack is ready on $(MINISTACK_EP)"
 
 .PHONY: ms-down
 ms-down:
-	@docker rm -f $(MINISTACK_NAME) 2>/dev/null && echo "✓ MiniStack stopped" || echo "MiniStack is not running"
+	@docker compose down -v
+	@echo "✓ MiniStack stopped"
 
 .PHONY: ms-restart
-ms-restart: ms-down ms-up
+ms-restart:
+	@docker compose restart
+	@docker compose up -d --wait
 
 .PHONY: ms-status
 ms-status:
-	@if docker ps --format '{{.Names}}' | grep -q '^$(MINISTACK_NAME)$$'; then \
-		echo "✓ MiniStack is running on $(MINISTACK_EP)"; \
-		echo "  Container: $$(docker ps --filter name=$(MINISTACK_NAME) --format '{{.Status}}')"; \
-	else \
-		echo "✗ MiniStack is not running"; \
-	fi
+	@docker compose ps
 
 .PHONY: ms-logs
 ms-logs:
-	@docker logs -f $(MINISTACK_NAME)
+	@docker compose logs -f ministack
 
 .PHONY: ms-reset
 ms-reset:
@@ -176,13 +159,13 @@ ms-reset:
 
 .PHONY: ms-enable
 ms-enable: tg-clean
-	@sed -i.bak 's/use_ministack = false/use_ministack = true/' $(LOCAL_HCL) && rm -f $(LOCAL_HCL).bak
-	@echo "✓ MiniStack enabled in $(LOCAL_HCL)"
+	@sed -i.bak 's/active_env = "aws"/active_env = "ministack"/' $(LOCAL_HCL) && rm -f $(LOCAL_HCL).bak
+	@echo "✓ Switched to ministack env in $(LOCAL_HCL)"
 
 .PHONY: ms-disable
 ms-disable: tg-clean
-	@sed -i.bak 's/use_ministack = true/use_ministack = false/' $(LOCAL_HCL) && rm -f $(LOCAL_HCL).bak
-	@echo "✓ MiniStack disabled in $(LOCAL_HCL)"
+	@sed -i.bak 's/active_env = "ministack"/active_env = "aws"/' $(LOCAL_HCL) && rm -f $(LOCAL_HCL).bak
+	@echo "✓ Switched to aws env in $(LOCAL_HCL)"
 
 .PHONY: ms-seed
 ms-seed: ms-up
@@ -196,6 +179,12 @@ ms-seed: ms-up
 			--key-schema AttributeName=LockID,KeyType=HASH \
 			--billing-mode PAY_PER_REQUEST 2>/dev/null || true
 	@echo "✓ State backend ready"
+
+.PHONY: ms-kubeconfig
+ms-kubeconfig:
+	@docker exec $(MINISTACK_EKS_CONTAINER) cat /etc/rancher/k3s/k3s.yaml \
+		| sed 's|127.0.0.1|localhost|g' > $(MINISTACK_KUBECONFIG)
+	@echo "✓ Kubeconfig written to $(MINISTACK_KUBECONFIG)"
 
 .PHONY: ms-test
 ms-test: ms-up
