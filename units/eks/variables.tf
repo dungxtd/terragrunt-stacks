@@ -48,3 +48,27 @@ variable "update_launch_template_default_version" {
   type        = bool
   default     = true
 }
+
+variable "node_instance_types" {
+  description = "EC2 instance types for EKS managed node group"
+  type        = list(string)
+  default     = ["t3.medium"]
+}
+
+variable "node_min_size" {
+  description = "Minimum number of nodes"
+  type        = number
+  default     = 1
+}
+
+variable "node_max_size" {
+  description = "Maximum number of nodes"
+  type        = number
+  default     = 3
+}
+
+variable "node_desired_size" {
+  description = "Desired number of nodes"
+  type        = number
+  default     = 2
+}
