@@ -102,7 +102,10 @@ jobs:
 
       - name: IAM policy simulation
         run: |
-          ROLE_ARN=$(aws sts get-caller-identity --query Arn --output text)
+          # assumed-role ARN → IAM role ARN
+          # arn:aws:sts::ID:assumed-role/ROLE/SESSION → arn:aws:iam::ID:role/ROLE
+          ROLE_ARN=$(aws sts get-caller-identity --query Arn --output text \
+            | sed 's|sts|iam|;s|assumed-role|role|;s|/[^/]*$||')
           DENIED=$(aws iam simulate-principal-policy \
             --policy-source-arn "$ROLE_ARN" \
             --action-names \
