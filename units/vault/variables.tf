@@ -3,33 +3,32 @@ variable "region" {
   type        = string
 }
 
-variable "kms_key_id" {
-  description = "KMS key ID for Vault auto-unseal"
+variable "helm_values" {
+  description = "YAML-encoded Helm values for the Vault chart"
   type        = string
 }
 
-variable "replicas" {
-  description = "Number of Vault server replicas"
-  type        = number
-  default     = 3
+variable "vault_mode" {
+  description = "Vault deployment mode: 'dev' (single-node, known root token) or 'ha' (raft, operator init)"
+  type        = string
+
+  validation {
+    condition     = contains(["dev", "ha"], var.vault_mode)
+    error_message = "vault_mode must be 'dev' or 'ha'."
+  }
 }
 
-variable "vault_sa_annotations" {
-  description = "Annotations for Vault service account (e.g., IRSA role ARN)"
-  type        = map(string)
-  default     = {}
+variable "dev_root_token" {
+  description = "Root token for dev mode. Only used when vault_mode = 'dev'."
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "tags" {
   description = "Common tags"
   type        = map(string)
   default     = {}
-}
-
-variable "use_ministack" {
-  description = "Running against MiniStack (localstack)"
-  type        = bool
-  default     = false
 }
 
 variable "ssm_endpoint" {
@@ -39,6 +38,6 @@ variable "ssm_endpoint" {
 }
 
 variable "kubeconfig_path" {
-  description = "Path to kubeconfig used by kubectl in init null_resource"
+  description = "Path to kubeconfig used by kubectl in init"
   type        = string
 }

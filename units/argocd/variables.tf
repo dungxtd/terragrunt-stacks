@@ -4,10 +4,10 @@ variable "enable_consul_project" {
   default     = false
 }
 
-variable "use_ministack" {
-  description = "Running against MiniStack — use NodePort instead of LoadBalancer"
-  type        = bool
-  default     = false
+variable "service_type" {
+  description = "Kubernetes service type for ArgoCD server (NodePort or LoadBalancer)"
+  type        = string
+  default     = "LoadBalancer"
 }
 
 variable "tags" {

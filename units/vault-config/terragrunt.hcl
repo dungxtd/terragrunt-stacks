@@ -7,16 +7,6 @@ include "vault" {
   expose = true
 }
 
-dependency "vault" {
-  config_path = "../vault"
-
-  mock_outputs = {
-    vault_address = "http://vault.vault.svc.cluster.local:8200"
-  }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-  mock_outputs_merge_strategy_with_state  = "shallow"
-}
-
 dependency "eks" {
   config_path = "../eks"
 
@@ -42,19 +32,19 @@ dependency "rds" {
 locals {
   _env_name                    = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
   _env_cfg                     = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
-  _use_ministack               = local._env_cfg.locals.use_ministack
   _rds_password                = get_env("RDS_MASTER_PASSWORD", "")
   _payments_processor_password = get_env("PAYMENTS_PROCESSOR_PASSWORD", "")
 }
 
 inputs = {
-  use_ministack      = local._use_ministack
   vault_address      = dependency.vault.outputs.vault_address
   kubernetes_host    = dependency.eks.outputs.cluster_endpoint
   kubernetes_ca_cert = base64decode(dependency.eks.outputs.cluster_certificate_authority_data)
-  rds_endpoint       = dependency.rds.outputs.rds_endpoint
-  rds_username       = dependency.rds.outputs.rds_username
-  rds_password       = local._rds_password
+
+  # Env config provides overrides; empty string → fall back to real RDS outputs
+  rds_endpoint = coalesce(local._env_cfg.locals.rds_endpoint_override, dependency.rds.outputs.rds_endpoint)
+  rds_username = coalesce(local._env_cfg.locals.rds_username_override, dependency.rds.outputs.rds_username)
+  rds_password = coalesce(local._env_cfg.locals.rds_password_override, local._rds_password)
 
   payments_processor_password = local._payments_processor_password
 }

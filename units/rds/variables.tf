@@ -72,6 +72,12 @@ variable "create_monitoring_role" {
   default     = true
 }
 
+variable "skip_final_snapshot" {
+  description = "Skip final snapshot when destroying the DB"
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Common tags"
   type        = map(string)

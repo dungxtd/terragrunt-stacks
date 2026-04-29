@@ -2,6 +2,7 @@ resource "helm_release" "consul" {
   name             = "consul"
   repository       = "https://helm.releases.hashicorp.com"
   chart            = "consul"
+  version          = "1.6.3"
   namespace        = "consul"
   create_namespace = true
 

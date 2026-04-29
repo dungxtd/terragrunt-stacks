@@ -10,7 +10,7 @@ locals {
 
   # Tags applied to all resources
   common_tags = {
-    Project   = "terragrunt-infra"
-    ManagedBy = "terragrunt"
+    Project     = local.project
+    ManagedBy   = "terragrunt"
   }
 }

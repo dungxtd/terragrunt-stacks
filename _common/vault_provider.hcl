@@ -10,21 +10,25 @@
 locals {
   _env_name      = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
   _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
-  _use_ministack = local._env_cfg.locals.use_ministack
-  _kubeconfig    = local._use_ministack ? "${get_repo_root()}/.kubeconfig-ministack" : pathexpand("~/.kube/config")
+  _kubeconfig    = local._env_cfg.locals.kubeconfig_path
   _vault_port    = 18200
 
-  # Local dev: port-forward to localhost; in-cluster (ARC): K8s DNS
-  _vault_address = local._use_ministack ? "http://localhost:${local._vault_port}" : "http://localhost:${local._vault_port}"
+  # Both local dev and CI reach Vault via port-forward on localhost
+  _vault_address = "http://localhost:${local._vault_port}"
 
-  # dependency.* not allowed in locals or generate blocks during stack evaluation.
-  # Fetch vault root token from SSM at parse time via run_cmd.
-  # MiniStack: reads from LocalStack; AWS: reads from real SSM. Falls back to "mock-token" if not yet initialized.
-  _vault_token = run_cmd("--terragrunt-quiet", "bash", "-c",
-    local._use_ministack
-    ? "AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=ap-southeast-1 aws ssm get-parameter --endpoint-url http://localhost:4566 --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text 2>/dev/null || echo root"
-    : "aws ssm get-parameter --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text 2>/dev/null || echo mock-token"
-  )
+  # Fetch vault root token from SSM at parse time.
+  # The actual command is env-specific and lives in envs/<env>.hcl.
+  _vault_token = run_cmd("--terragrunt-quiet", "bash", "-c", local._env_cfg.locals.vault_token_cmd)
+}
+
+dependency "vault" {
+  config_path = "../vault"
+
+  mock_outputs = {
+    vault_address = "http://vault.vault.svc.cluster.local:8200"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+  mock_outputs_merge_strategy_with_state  = "shallow"
 }
 
 generate "vault_provider" {
@@ -49,13 +53,12 @@ terraform {
   }
 }
 
-# Satisfy the kubernetes/helm providers required by root.hcl versions.tf
 generate "k8s_providers" {
   path      = "k8s_providers.tf"
   if_exists = "overwrite_terragrunt"
   contents  = <<-EOF
     provider "helm" {
-      kubernetes {
+      kubernetes = {
         config_path = "${local._kubeconfig}"
       }
     }

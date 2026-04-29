@@ -25,10 +25,9 @@ resource "vault_transit_secret_backend_key" "payments" {
 # ── Database Secrets Engine ──────────────────────────────────────
 
 locals {
-  # MiniStack: Vault (k3s) reaches the real PG container via host.docker.internal
-  db_endpoint = var.use_ministack ? "host.docker.internal:15432" : var.rds_endpoint
-  db_username = var.use_ministack ? "postgres" : var.rds_username
-  db_password = var.use_ministack ? "password" : var.rds_password
+  db_endpoint = var.rds_endpoint
+  db_username = var.rds_username
+  db_password = var.rds_password
 }
 
 resource "vault_mount" "database" {

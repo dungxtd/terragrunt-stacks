@@ -13,6 +13,7 @@ resource "helm_release" "arc_controller" {
   name             = "arc"
   repository       = "oci://ghcr.io/actions/actions-runner-controller-charts"
   chart            = "gha-runner-scale-set-controller"
+  version          = "0.14.0"
   namespace        = local.controller_namespace
   create_namespace = true
 
@@ -76,6 +77,7 @@ resource "helm_release" "arc_runner_set" {
   name       = var.runner_scale_set_name
   repository = "oci://ghcr.io/actions/actions-runner-controller-charts"
   chart      = "gha-runner-scale-set"
+  version    = "0.14.0"
   namespace  = local.runner_namespace
 
   values = [yamlencode({

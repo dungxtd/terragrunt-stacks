@@ -43,10 +43,19 @@ make ms-teardown           # Stop local env
 make tg-clean              # Clear cache
 ```
 
+## AWS Authentication
+
+| Context | Method | Details |
+|---|---|---|
+| **Local dev** | `AWS_PROFILE` / `aws configure` | Set via `source load_env.sh` or `export AWS_PROFILE=...` |
+| **CI/CD** | OIDC federation | GitHub Actions assumes `AWS_ROLE_ARN` via `aws-actions/configure-aws-credentials` |
+
+> **Do not** add `--profile` flags to the Makefile — it breaks CI where OIDC env vars are injected automatically.
+
 ## Docs
 
 - [Architecture diagrams](docs/architecture.md) — network topology, vault flow, env comparison
 
 ## Prerequisites
 
-Terragrunt ≥ 0.77 · Terraform ≥ 1.13 · Docker (OrbStack recommended) · kubectl · Helm 3 · AWS CLI v2
+Terragrunt ≥ 1.0.3 · Terraform ≥ 1.12 · Docker (OrbStack recommended) · kubectl · Helm 3 · AWS CLI v2

@@ -1,6 +1,6 @@
 # Terraform
 .terraform/
-.terraform.lock.hcl
+# Keep .terraform.lock.hcl committed for reproducibility
 *.tfstate
 *.tfstate.*
 *.tfplan

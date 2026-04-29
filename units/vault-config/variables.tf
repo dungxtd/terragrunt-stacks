@@ -36,9 +36,3 @@ variable "payments_processor_password" {
   sensitive   = true
   default     = ""
 }
-
-variable "use_ministack" {
-  description = "Whether running on MiniStack (skip resources that can't reach real RDS)"
-  type        = bool
-  default     = false
-}

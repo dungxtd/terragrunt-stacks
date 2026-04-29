@@ -1,88 +1,19 @@
-locals {
-  vault_dev_values = yamlencode({
-    server = {
-      enabled = true
-      dev = {
-        enabled      = true
-        devRootToken = "root"
-      }
-      serviceAccount = {
-        annotations = var.vault_sa_annotations
-      }
-    }
-    injector = { enabled = false }
-    csi      = { enabled = false }
-    ui       = { enabled = true }
-  })
-
-  vault_ha_values = yamlencode({
-    server = {
-      enabled = true
-      ha = {
-        enabled  = true
-        replicas = var.replicas
-        raft = {
-          enabled = true
-          config  = <<-EOF
-            ui = true
-
-            listener "tcp" {
-              tls_disable     = 1
-              address         = "[::]:8200"
-              cluster_address = "[::]:8201"
-            }
-
-            storage "raft" {
-              path = "/vault/data"
-            }
-
-            seal "awskms" {
-              region     = "${var.region}"
-              kms_key_id = "${var.kms_key_id}"
-            }
-
-            service_registration "kubernetes" {}
-          EOF
-        }
-      }
-
-      dataStorage = {
-        enabled      = true
-        size         = "10Gi"
-        storageClass = null
-      }
-
-      extraEnvironmentVars = {
-        VAULT_SEAL_TYPE          = "awskms"
-        VAULT_AWSKMS_SEAL_KEY_ID = var.kms_key_id
-        AWS_REGION               = var.region
-      }
-
-      serviceAccount = {
-        annotations = var.vault_sa_annotations
-      }
-    }
-
-    injector = { enabled = true }
-    csi      = { enabled = true }
-    ui       = { enabled = true }
-  })
-}
-
 resource "helm_release" "vault" {
   name             = "vault"
   repository       = "https://helm.releases.hashicorp.com"
   chart            = "vault"
+  version          = "0.32.0"
   namespace        = "vault"
   create_namespace = true
 
-  values = [var.use_ministack ? local.vault_dev_values : local.vault_ha_values]
+  values = [var.helm_values]
 }
 
 resource "helm_release" "vault_secrets_operator" {
   name             = "vault-secrets-operator"
   repository       = "https://helm.releases.hashicorp.com"
   chart            = "vault-secrets-operator"
+  version          = "1.3.0"
   namespace        = "vault-secrets-operator-system"
   create_namespace = true
 
@@ -92,9 +23,10 @@ resource "helm_release" "vault_secrets_operator" {
 locals {
   ssm_token_name   = "/terragrunt-infra/vault/root-token"
   ssm_endpoint_arg = var.ssm_endpoint != "" ? "--endpoint-url ${var.ssm_endpoint}" : ""
+  ssm_env_prefix   = var.ssm_endpoint != "" ? "AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=${var.region}" : "AWS_DEFAULT_REGION=${var.region}"
 }
 
-resource "null_resource" "vault_init" {
+resource "terraform_data" "vault_init" {
   depends_on = [helm_release.vault, helm_release.vault_secrets_operator]
 
   provisioner "local-exec" {
@@ -110,21 +42,19 @@ resource "null_resource" "vault_init" {
         -l app.kubernetes.io/name=vault \
         -n vault --timeout=300s
 
-      if [ "${var.use_ministack}" = "true" ]; then
-        # Dev mode: already unsealed, root token is hardcoded "root"
-        echo "MiniStack dev mode — storing hardcoded root token in SSM..."
-        AWS_ACCESS_KEY_ID="test" \
-        AWS_SECRET_ACCESS_KEY="test" \
-        AWS_DEFAULT_REGION="${var.region}" \
+      if [ "${var.vault_mode}" = "dev" ]; then
+        # Dev mode: already unsealed, token is known
+        echo "Dev mode — storing root token in SSM..."
+        ${local.ssm_env_prefix} \
         aws ssm put-parameter \
           --name "${local.ssm_token_name}" \
-          --value "root" \
+          --value "${var.dev_root_token}" \
           --type SecureString \
           --overwrite \
           ${local.ssm_endpoint_arg}
         echo "Done."
       else
-        # Production: port-forward and run vault operator init
+        # HA mode: port-forward and run vault operator init
         kubectl port-forward svc/vault 18200:8200 -n vault &
         PF_PID=$!
         trap "kill $PF_PID 2>/dev/null || true" EXIT
@@ -159,14 +89,15 @@ resource "null_resource" "vault_init" {
     EOF
   }
 
-  triggers = {
-    vault_helm_version = helm_release.vault.metadata[0].app_version
-  }
+  triggers_replace = [
+    helm_release.vault.metadata.app_version,
+    helm_release.vault.version,
+  ]
 }
 
 data "aws_ssm_parameter" "vault_root_token" {
   name            = local.ssm_token_name
   with_decryption = true
 
-  depends_on = [null_resource.vault_init]
+  depends_on = [terraform_data.vault_init]
 }

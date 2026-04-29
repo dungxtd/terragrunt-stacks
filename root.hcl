@@ -23,8 +23,9 @@ locals {
 
       default_tags {
         tags = {
-          Project   = "${local.project}"
-          ManagedBy = "terragrunt"
+          Project     = "${local.project}"
+          Environment = "${local._env_name}"
+          ManagedBy   = "terragrunt"
         }
       }
     }
@@ -44,8 +45,9 @@ locals {
 
       default_tags {
         tags = {
-          Project   = "${local.project}"
-          ManagedBy = "terragrunt"
+          Project     = "${local.project}"
+          Environment = "${local._env_name}"
+          ManagedBy   = "terragrunt"
         }
       }
 
@@ -108,24 +110,24 @@ generate "versions" {
   if_exists = "overwrite_terragrunt"
   contents  = <<-EOF
     terraform {
-      required_version = ">= 1.7"
+      required_version = ">= 1.12"
 
       required_providers {
         aws = {
           source  = "hashicorp/aws"
-          version = "~> 5.0"
+          version = "~> 6.42"
         }
         helm = {
           source  = "hashicorp/helm"
-          version = "~> 2.0"
+          version = "~> 3.1"
         }
         kubernetes = {
           source  = "hashicorp/kubernetes"
-          version = "~> 2.0"
+          version = "~> 2.35"
         }
         vault = {
           source  = "hashicorp/vault"
-          version = "~> 4.0"
+          version = "~> 5.2"
         }
         tls = {
           source  = "hashicorp/tls"
