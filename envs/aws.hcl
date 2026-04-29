@@ -25,15 +25,15 @@ locals {
   single_nat_gateway = false
 
   # RDS
-  rds_multi_az                  = false
-  rds_deletion_protection       = false
-  rds_performance_insights      = false
-  rds_monitoring_interval       = 0
-  rds_create_monitoring_role    = false
-  rds_instance_class            = "db.t3.micro"
-  rds_backup_retention_period   = 0
-  rds_allocated_storage         = 20
-  rds_max_allocated_storage     = 20
+  rds_multi_az                = false
+  rds_deletion_protection     = false
+  rds_performance_insights    = false
+  rds_monitoring_interval     = 0
+  rds_create_monitoring_role  = false
+  rds_instance_class          = "db.t3.micro"
+  rds_backup_retention_period = 0
+  rds_allocated_storage       = 20
+  rds_max_allocated_storage   = 20
 
   # GitHub Actions Runner
   enable_github_runner = true
