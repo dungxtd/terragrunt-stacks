@@ -3,8 +3,14 @@ variable "vault_address" {
   type        = string
 }
 
+variable "vault_token" {
+  description = "Vault root token for provider auth"
+  type        = string
+  sensitive   = true
+}
+
 variable "organization" {
-  description = "Organization name for CA certificates"
+  description = "Organization name for CA subject"
   type        = string
   default     = "HashiCorp Demo"
 }
