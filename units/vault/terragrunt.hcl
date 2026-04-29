@@ -1,5 +1,6 @@
 include "root" {
-  path = find_in_parent_folders("root.hcl")
+  path   = find_in_parent_folders("root.hcl")
+  expose = true
 }
 
 include "k8s" {
@@ -8,7 +9,8 @@ include "k8s" {
 }
 
 locals {
-  common = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  common  = read_terragrunt_config(find_in_parent_folders("common.hcl"))
+  env_cfg = include.root.locals.env_cfg
 }
 
 dependency "kms" {
@@ -20,8 +22,11 @@ dependency "kms" {
 }
 
 inputs = {
-  region     = local.common.locals.region
-  kms_key_id = dependency.kms.outputs.vault_unseal_key_id
-  replicas   = 3
-  tags       = local.common.locals.common_tags
+  region          = local.common.locals.region
+  kms_key_id      = dependency.kms.outputs.vault_unseal_key_id
+  replicas        = 3
+  tags            = local.common.locals.common_tags
+  use_ministack   = local.env_cfg.locals.use_ministack
+  ssm_endpoint    = local.env_cfg.locals.use_ministack ? local.env_cfg.locals.endpoint : ""
+  kubeconfig_path = local.env_cfg.locals.use_ministack ? "${get_repo_root()}/.kubeconfig-ministack" : pathexpand("~/.kube/config")
 }
