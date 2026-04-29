@@ -11,11 +11,13 @@ TG_FLAGS := --non-interactive --backend-bootstrap
 STACKS_MAP := vault:vault-consul
 
 define stack-rule
-.PHONY: stack-$(1)
+.PHONY: stack-$(1) stack-$(1)-generate
+stack-$(1)-generate:
+	cd $(STACKS)/$2 && terragrunt stack generate $(TG_FLAGS)
 stack-$(1):
 	$$(eval ACTION := $$(filter plan apply destroy,$$(MAKECMDGOALS)))
 	@if [ -z "$$(ACTION)" ]; then echo "Usage: make stack-$(1) <plan|apply|destroy>"; exit 1; fi
-	cd $(STACKS)/$2 && terragrunt stack generate && terragrunt stack run $$(ACTION) $(TG_FLAGS)
+	cd $(STACKS)/$2 && terragrunt stack generate $(TG_FLAGS) && terragrunt stack run $$(ACTION) $(TG_FLAGS)
 	@if [ "$$(ACTION)" = "apply" ] && [ -f .kubeconfig-ministack ]; then \
 		echo ""; \
 		echo "  KUBECONFIG: export KUBECONFIG=$$(pwd)/.kubeconfig-ministack"; \
