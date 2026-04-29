@@ -183,72 +183,11 @@ jobs:
       - name: Ensure AWS env active
         run: make ms-disable
 
-      - name: Pre-apply readiness checks
-        run: |
-          failed=0
-
-          # EKS cluster ACTIVE (skip if not yet deployed)
-          CLUSTER_NAME=$(cd units/eks && terragrunt output -raw cluster_name 2>/dev/null || echo "")
-          if [ -n "$CLUSTER_NAME" ]; then
-            STATUS=$(aws eks describe-cluster --name "$CLUSTER_NAME" \
-              --query 'cluster.status' --output text 2>/dev/null || echo "NOT_FOUND")
-            if [ "$STATUS" != "ACTIVE" ] && [ "$STATUS" != "NOT_FOUND" ]; then
-              echo "EKS not ACTIVE (got: $STATUS)"; failed=1
-            fi
-          fi
-
-          # RDS available (skip if not yet deployed)
-          RDS_ID=$(cd units/rds && terragrunt output -raw rds_endpoint 2>/dev/null | cut -d: -f1 || echo "")
-          if [ -n "$RDS_ID" ]; then
-            STATUS=$(aws rds describe-db-instances \
-              --db-instance-identifier "$RDS_ID" \
-              --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || echo "not-found")
-            if [ "$STATUS" != "available" ] && [ "$STATUS" != "not-found" ]; then
-              echo "RDS not available (got: $STATUS)"; failed=1
-            fi
-          fi
-
-          # No state lock held
-          LOCK=$(aws dynamodb get-item \
-            --table-name tf-state-lock \
-            --key "{\"LockID\":{\"S\":\"${{ env.STATE_BUCKET }}/${{ env.STATE_PREFIX }}/terraform.tfstate\"}}" \
-            --query 'Item' --output text 2>/dev/null)
-          [ -z "$LOCK" ] || [ "$LOCK" = "None" ] || { echo "State lock held: $LOCK"; failed=1; }
-
-          exit $failed
-
-      - name: Snapshot state before apply
-        id: snapshot
-        run: |
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          echo "SNAPSHOT_TS=$TIMESTAMP" >> "$GITHUB_ENV"
-          for unit in ${{ env.STATE_UNITS }}; do
-            aws s3 cp \
-              "s3://${{ env.STATE_BUCKET }}/${{ env.STATE_PREFIX }}/${unit}/terraform.tfstate" \
-              "s3://${{ env.STATE_BUCKET }}/backups/${TIMESTAMP}/${unit}/terraform.tfstate" \
-              2>/dev/null || true
-          done
-          echo "Snapshot saved: backups/$TIMESTAMP"
 
       - name: Terragrunt apply
-        id: apply
         env:
           GITHUB_CONFIG_URL: ${{ secrets.GITHUB_CONFIG_URL }}
           GITHUB_APP_ID: ${{ secrets.ARC_APP_ID }}
           GITHUB_APP_INSTALLATION_ID: ${{ secrets.ARC_APP_INSTALLATION_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.ARC_APP_PRIVATE_KEY }}
         run: make stack-vault apply
-
-      - name: Rollback state on apply failure
-        if: failure() && steps.apply.outcome == 'failure'
-        run: |
-          echo "Apply failed — restoring state from snapshot ${{ env.SNAPSHOT_TS }}"
-          for unit in ${{ env.STATE_UNITS }}; do
-            aws s3 cp \
-              "s3://${{ env.STATE_BUCKET }}/backups/${{ env.SNAPSHOT_TS }}/${unit}/terraform.tfstate" \
-              "s3://${{ env.STATE_BUCKET }}/${{ env.STATE_PREFIX }}/${unit}/terraform.tfstate" \
-              2>/dev/null && echo "✓ $unit restored" || echo "⚠ $unit had no snapshot (not yet deployed)"
-          done
-          echo ""
-          echo "State restored. AWS resources already created still exist — review manually."
-          exit 1
