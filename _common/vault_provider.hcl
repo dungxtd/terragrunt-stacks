@@ -16,6 +16,9 @@ locals {
 
   # Local dev: port-forward to localhost; in-cluster (ARC): K8s DNS
   _vault_address = local._use_ministack ? "http://localhost:${local._vault_port}" : "http://localhost:${local._vault_port}"
+
+  # Resolved here so generate block can reference local.* (dependency.* not allowed in generate contents)
+  _vault_token = dependency.vault.outputs.vault_root_token
 }
 
 dependency "vault" {
@@ -35,7 +38,7 @@ generate "vault_provider" {
   contents  = <<-EOF
     provider "vault" {
       address          = "${local._vault_address}"
-      token            = "${dependency.vault.outputs.vault_root_token}"
+      token            = "${local._vault_token}"
       skip_child_token = true
     }
   EOF
