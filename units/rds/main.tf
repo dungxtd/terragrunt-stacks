@@ -10,8 +10,8 @@ module "rds" {
   major_engine_version = "15"
   instance_class       = var.instance_class
 
-  allocated_storage     = 20
-  max_allocated_storage = 100
+  allocated_storage     = var.allocated_storage
+  max_allocated_storage = var.max_allocated_storage
 
   db_name  = "payments"
   username = "postgres"
@@ -23,7 +23,7 @@ module "rds" {
   db_subnet_group_name   = var.database_subnet_group_name
   vpc_security_group_ids = [aws_security_group.rds.id]
 
-  backup_retention_period = 7
+  backup_retention_period = var.backup_retention_period
   deletion_protection     = var.deletion_protection
   skip_final_snapshot     = true
 

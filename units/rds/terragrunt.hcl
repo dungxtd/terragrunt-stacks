@@ -25,9 +25,13 @@ inputs = {
   database_subnet_group_name = dependency.vpc.outputs.database_subnet_group_name
   tags                       = local.common.locals.common_tags
 
-  multi_az               = local.env_cfg.locals.rds_multi_az
-  deletion_protection    = local.env_cfg.locals.rds_deletion_protection
-  performance_insights   = local.env_cfg.locals.rds_performance_insights
-  monitoring_interval    = local.env_cfg.locals.rds_monitoring_interval
-  create_monitoring_role = local.env_cfg.locals.rds_create_monitoring_role
+  multi_az                  = local.env_cfg.locals.rds_multi_az
+  deletion_protection       = local.env_cfg.locals.rds_deletion_protection
+  performance_insights      = local.env_cfg.locals.rds_performance_insights
+  monitoring_interval       = local.env_cfg.locals.rds_monitoring_interval
+  create_monitoring_role    = local.env_cfg.locals.rds_create_monitoring_role
+  instance_class            = local.env_cfg.locals.rds_instance_class
+  backup_retention_period   = local.env_cfg.locals.rds_backup_retention_period
+  allocated_storage         = local.env_cfg.locals.rds_allocated_storage
+  max_allocated_storage     = local.env_cfg.locals.rds_max_allocated_storage
 }

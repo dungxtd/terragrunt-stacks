@@ -18,10 +18,10 @@ module "eks" {
 
   eks_managed_node_groups = {
     default = {
-      instance_types = ["m5.large"]
-      min_size       = 2
-      max_size       = 5
-      desired_size   = 3
+      instance_types = var.node_instance_types
+      min_size       = var.node_min_size
+      max_size       = var.node_max_size
+      desired_size   = var.node_desired_size
 
       update_launch_template_default_version = var.update_launch_template_default_version
 

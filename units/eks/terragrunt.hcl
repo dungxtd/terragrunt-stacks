@@ -28,6 +28,10 @@ inputs = {
   create_cluster_addons                    = local.env_cfg.locals.create_cluster_addons
   enable_cluster_creator_admin_permissions = local.env_cfg.locals.enable_cluster_creator_admin_permissions
   update_launch_template_default_version   = local.env_cfg.locals.update_launch_template_default_version
+  node_instance_types                      = local.env_cfg.locals.eks_node_instance_types
+  node_min_size                            = local.env_cfg.locals.eks_node_min_size
+  node_max_size                            = local.env_cfg.locals.eks_node_max_size
+  node_desired_size                        = local.env_cfg.locals.eks_node_desired_size
 }
 
 terraform {
