@@ -1,11 +1,21 @@
-resource "helm_release" "vault" {
-  name             = "vault"
-  repository       = "https://helm.releases.hashicorp.com"
-  chart            = "vault"
-  namespace        = "vault"
-  create_namespace = true
+locals {
+  vault_dev_values = yamlencode({
+    server = {
+      enabled = true
+      dev = {
+        enabled      = true
+        devRootToken = "root"
+      }
+      serviceAccount = {
+        annotations = var.vault_sa_annotations
+      }
+    }
+    injector = { enabled = false }
+    csi      = { enabled = false }
+    ui       = { enabled = true }
+  })
 
-  values = [yamlencode({
+  vault_ha_values = yamlencode({
     server = {
       enabled = true
       ha = {
@@ -53,18 +63,20 @@ resource "helm_release" "vault" {
       }
     }
 
-    injector = {
-      enabled = true
-    }
+    injector = { enabled = true }
+    csi      = { enabled = true }
+    ui       = { enabled = true }
+  })
+}
 
-    csi = {
-      enabled = true
-    }
+resource "helm_release" "vault" {
+  name             = "vault"
+  repository       = "https://helm.releases.hashicorp.com"
+  chart            = "vault"
+  namespace        = "vault"
+  create_namespace = true
 
-    ui = {
-      enabled = true
-    }
-  })]
+  values = [var.use_ministack ? local.vault_dev_values : local.vault_ha_values]
 }
 
 resource "helm_release" "vault_secrets_operator" {
@@ -98,39 +110,51 @@ resource "null_resource" "vault_init" {
         -l app.kubernetes.io/name=vault \
         -n vault --timeout=300s
 
-      # Port-forward vault (use high port to avoid conflicts)
-      kubectl port-forward svc/vault 18200:8200 -n vault &
-      PF_PID=$!
-      trap "kill $PF_PID 2>/dev/null || true" EXIT
-      sleep 5
-
-      export VAULT_ADDR="http://127.0.0.1:18200"
-
-      INITIALIZED=$(vault status -format=json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['initialized'])" 2>/dev/null || echo "false")
-
-      if [ "$INITIALIZED" = "False" ] || [ "$INITIALIZED" = "false" ]; then
-        echo "Initializing Vault..."
-        INIT_JSON=$(vault operator init \
-          -recovery-shares=1 \
-          -recovery-threshold=1 \
-          -format=json)
-
-        ROOT_TOKEN=$(echo "$INIT_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['root_token'])")
-
-        echo "Storing root token in SSM..."
-        AWS_ACCESS_KEY_ID="${var.use_ministack ? "test" : ""}" \
-        AWS_SECRET_ACCESS_KEY="${var.use_ministack ? "test" : ""}" \
+      if [ "${var.use_ministack}" = "true" ]; then
+        # Dev mode: already unsealed, root token is hardcoded "root"
+        echo "MiniStack dev mode — storing hardcoded root token in SSM..."
+        AWS_ACCESS_KEY_ID="test" \
+        AWS_SECRET_ACCESS_KEY="test" \
         AWS_DEFAULT_REGION="${var.region}" \
         aws ssm put-parameter \
           --name "${local.ssm_token_name}" \
-          --value "$ROOT_TOKEN" \
+          --value "root" \
           --type SecureString \
           --overwrite \
           ${local.ssm_endpoint_arg}
-
-        echo "Vault initialized and root token stored."
+        echo "Done."
       else
-        echo "Vault already initialized, skipping."
+        # Production: port-forward and run vault operator init
+        kubectl port-forward svc/vault 18200:8200 -n vault &
+        PF_PID=$!
+        trap "kill $PF_PID 2>/dev/null || true" EXIT
+        sleep 5
+
+        export VAULT_ADDR="http://127.0.0.1:18200"
+
+        INITIALIZED=$(vault status -format=json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['initialized'])" 2>/dev/null || echo "false")
+
+        if [ "$INITIALIZED" = "False" ] || [ "$INITIALIZED" = "false" ]; then
+          echo "Initializing Vault..."
+          INIT_JSON=$(vault operator init \
+            -recovery-shares=1 \
+            -recovery-threshold=1 \
+            -format=json)
+
+          ROOT_TOKEN=$(echo "$INIT_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['root_token'])")
+
+          echo "Storing root token in SSM..."
+          AWS_DEFAULT_REGION="${var.region}" \
+          aws ssm put-parameter \
+            --name "${local.ssm_token_name}" \
+            --value "$ROOT_TOKEN" \
+            --type SecureString \
+            --overwrite
+
+          echo "Vault initialized and root token stored."
+        else
+          echo "Vault already initialized, skipping."
+        fi
       fi
     EOF
   }

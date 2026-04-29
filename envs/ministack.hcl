@@ -26,4 +26,7 @@ locals {
   rds_performance_insights  = false
   rds_monitoring_interval   = 0
   rds_create_monitoring_role = false
+
+  # GitHub Actions Runner: not needed locally
+  enable_github_runner = false
 }

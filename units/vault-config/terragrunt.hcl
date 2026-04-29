@@ -2,12 +2,9 @@ include "root" {
   path = find_in_parent_folders("root.hcl")
 }
 
-dependency "vault" {
-  config_path = "../vault"
-
-  mock_outputs = {
-    vault_address = "http://vault.vault.svc.cluster.local:8200"
-  }
+include "vault" {
+  path   = "${get_repo_root()}/_common/vault_provider.hcl"
+  expose = true
 }
 
 dependency "eks" {
@@ -28,7 +25,14 @@ dependency "rds" {
   }
 }
 
+locals {
+  _local_cfg     = read_terragrunt_config("${get_repo_root()}/local.hcl")
+  _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._local_cfg.locals.active_env}.hcl")
+  _use_ministack = local._env_cfg.locals.use_ministack
+}
+
 inputs = {
+  use_ministack      = local._use_ministack
   vault_address      = dependency.vault.outputs.vault_address
   kubernetes_host    = dependency.eks.outputs.cluster_endpoint
   kubernetes_ca_cert = base64decode(dependency.eks.outputs.cluster_certificate_authority_data)

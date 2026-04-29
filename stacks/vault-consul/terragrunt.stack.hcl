@@ -19,38 +19,19 @@ unit "kms" {
   path   = "kms"
 }
 
-# ── Layer 4: Platform (parallel) ─────────────────────────────────
-
-unit "vault" {
-  source = "../../units/vault"
-  path   = "vault"
-}
-
-unit "consul" {
-  source = "../../units/consul"
-  path   = "consul"
-}
-
-unit "argocd" {
-  source = "../../units/argocd"
-  path   = "argocd"
-
-  values = {
-    enable_consul_project = true
-  }
-}
+# ── Layer 4: Data + Vault ────────────────────────────────────────
 
 unit "rds" {
   source = "../../units/rds"
   path   = "rds"
 }
 
-unit "datadog" {
-  source = "../../units/datadog"
-  path   = "datadog"
+unit "vault" {
+  source = "../../units/vault"
+  path   = "vault"
 }
 
-# ── Layer 5: PKI + Vault Config ──────────────────────────────────
+# ── Layer 5: Vault Config + PKI ──────────────────────────────────
 
 unit "certs" {
   source = "../../units/certs"
@@ -62,14 +43,21 @@ unit "vault_config" {
   path   = "vault-config"
 }
 
-# ── Layer 6: Progressive Delivery ────────────────────────────────
+# ── Layer 6: Platform + GitOps ───────────────────────────────────
 
-unit "flagger" {
-  source = "../../units/flagger"
-  path   = "flagger"
+unit "linkerd" {
+  source = "../../units/linkerd"
+  path   = "linkerd"
+}
 
-  values = {
-    mesh_provider  = "consul"
-    metrics_server = "http://prometheus-server.default:9090"
-  }
+unit "argocd" {
+  source = "../../units/argocd"
+  path   = "argocd"
+}
+
+# ── Layer 7: CI/CD Runner ──────────────────────────────────
+
+unit "github_runner" {
+  source = "../../units/github-runner"
+  path   = "github-runner"
 }

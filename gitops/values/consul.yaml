@@ -1,0 +1,44 @@
+global:
+  name: consul
+  datacenter: dc1
+  acls:
+    manageSystemACLs: true
+  tls:
+    enabled: true
+  metrics:
+    enabled: true
+    enableAgentMetrics: true
+
+server:
+  enabled: true
+  replicas: 3
+  storage: 10Gi
+
+client:
+  enabled: true
+
+connectInject:
+  enabled: true
+  default: true
+  transparentProxy:
+    defaultEnabled: true
+
+apiGateway:
+  enabled: true
+  managedGatewayClass:
+    serviceType: LoadBalancer
+
+terminatingGateways:
+  enabled: true
+  defaults:
+    replicas: 1
+  gateways:
+    - name: terminating-gateway
+
+meshGateway:
+  enabled: false
+
+ui:
+  enabled: true
+  service:
+    type: LoadBalancer

@@ -1,0 +1,94 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          # ── Wave 1: Service Mesh ──────────────────────────────
+          - app: consul
+            repoURL: https://helm.releases.hashicorp.com
+            chart: consul
+            targetRevision: "1.4.*"
+            namespace: consul
+            wave: "1"
+
+          # ── Wave 2: Infrastructure controllers ───────────────
+          - app: aws-alb
+            repoURL: https://aws.github.io/eks-charts
+            chart: aws-load-balancer-controller
+            targetRevision: "*"
+            namespace: kube-system
+            wave: "2"
+
+          - app: datadog
+            repoURL: https://helm.datadoghq.com
+            chart: datadog
+            targetRevision: "*"
+            namespace: datadog
+            wave: "2"
+
+          # ── Wave 3: Progressive Delivery ─────────────────────
+          - app: flagger
+            repoURL: https://flagger.app
+            chart: flagger
+            targetRevision: "*"
+            namespace: flagger-system
+            wave: "3"
+
+  template:
+    metadata:
+      name: "{{app}}"
+      namespace: argocd
+      annotations:
+        argocd.argoproj.io/sync-wave: "{{wave}}"
+    spec:
+      project: default
+      sources:
+        - repoURL: "{{repoURL}}"
+          chart: "{{chart}}"
+          targetRevision: "{{targetRevision}}"
+          helm:
+            valueFiles:
+              - $values/gitops/values/{{app}}.yaml
+        - repoURL: https://github.com/dungxtd/terragrunt-stacks
+          targetRevision: main
+          ref: values
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+---
+# payments-app deployed from this git repo (Helm chart in gitops/charts/)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: payments-app
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dungxtd/terragrunt-stacks
+    targetRevision: main
+    path: gitops/charts/payments-app
+    helm:
+      valueFiles:
+        - values/vault-consul.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: payments-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

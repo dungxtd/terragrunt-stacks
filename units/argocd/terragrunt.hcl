@@ -9,4 +9,5 @@ include "k8s" {
 
 inputs = {
   enable_consul_project = try(values.enable_consul_project, false)
+  use_ministack         = include.k8s.locals._use_ministack
 }
