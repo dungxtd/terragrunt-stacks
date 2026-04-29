@@ -213,7 +213,7 @@ jobs:
             --table-name tf-state-lock \
             --key "{\"LockID\":{\"S\":\"${{ env.STATE_BUCKET }}/${{ env.STATE_PREFIX }}/terraform.tfstate\"}}" \
             --query 'Item' --output text 2>/dev/null)
-          [ -z "$LOCK" ] || { echo "State lock held: $LOCK"; failed=1; }
+          [ -z "$LOCK" ] || [ "$LOCK" = "None" ] || { echo "State lock held: $LOCK"; failed=1; }
 
           exit $failed
 
