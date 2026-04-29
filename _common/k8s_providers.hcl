@@ -6,8 +6,8 @@
 #   aws       → config_path = ~/.kube/config                (run: make kubeconfig)
 
 locals {
-  _local_cfg     = read_terragrunt_config("${get_repo_root()}/local.hcl")
-  _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._local_cfg.locals.active_env}.hcl")
+  _env_name      = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
+  _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
   _use_ministack = local._env_cfg.locals.use_ministack
 
   _kubeconfig_path = local._use_ministack ? "${get_repo_root()}/.kubeconfig-ministack" : "~/.kube/config"
