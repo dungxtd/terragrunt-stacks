@@ -16,6 +16,17 @@ dependency "vpc" {
   mock_outputs = { vpc_id = "vpc-mock" }
 }
 
+dependency "eks" {
+  config_path = "../eks"
+
+  mock_outputs = {
+    cluster_name      = "mock-cluster"
+    oidc_provider_arn = "arn:aws:iam::mock:oidc-provider/mock"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+  mock_outputs_merge_strategy_with_state  = "shallow"
+}
+
 inputs = {
   project           = local.common.locals.project
   region            = local.common.locals.region

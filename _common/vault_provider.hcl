@@ -8,8 +8,8 @@
 #   local dev               → localhost via port-forward or NodePort
 
 locals {
-  _local_cfg     = read_terragrunt_config("${get_repo_root()}/local.hcl")
-  _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._local_cfg.locals.active_env}.hcl")
+  _env_name      = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
+  _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
   _use_ministack = local._env_cfg.locals.use_ministack
   _kubeconfig    = local._use_ministack ? "${get_repo_root()}/.kubeconfig-ministack" : pathexpand("~/.kube/config")
   _vault_port    = 18200
@@ -17,19 +17,14 @@ locals {
   # Local dev: port-forward to localhost; in-cluster (ARC): K8s DNS
   _vault_address = local._use_ministack ? "http://localhost:${local._vault_port}" : "http://localhost:${local._vault_port}"
 
-  # Resolved here so generate block can reference local.* (dependency.* not allowed in generate contents)
-  _vault_token = dependency.vault.outputs.vault_root_token
-}
-
-dependency "vault" {
-  config_path = "../vault"
-
-  mock_outputs = {
-    vault_address    = "http://vault.vault.svc.cluster.local:8200"
-    vault_root_token = "mock-token"
-  }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan", "destroy"]
-  mock_outputs_merge_strategy_with_state  = "shallow"
+  # dependency.* not allowed in locals or generate blocks during stack evaluation.
+  # Fetch vault root token from SSM at parse time via run_cmd.
+  # MiniStack: reads from LocalStack; AWS: reads from real SSM. Falls back to "mock-token" if not yet initialized.
+  _vault_token = run_cmd("--terragrunt-quiet", "bash", "-c",
+    local._use_ministack
+    ? "AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=ap-southeast-1 aws ssm get-parameter --endpoint-url http://localhost:4566 --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text 2>/dev/null || echo root"
+    : "aws ssm get-parameter --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text 2>/dev/null || echo mock-token"
+  )
 }
 
 generate "vault_provider" {

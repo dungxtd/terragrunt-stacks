@@ -1,7 +1,11 @@
 locals {
-  common    = read_terragrunt_config("${get_repo_root()}/common.hcl")
-  local_cfg = read_terragrunt_config("${get_repo_root()}/local.hcl")
-  env_cfg   = read_terragrunt_config("${get_repo_root()}/envs/${local.local_cfg.locals.active_env}.hcl")
+  common = read_terragrunt_config("${get_repo_root()}/common.hcl")
+
+  # Env resolved from the nearest env.hcl walking up from the unit directory.
+  # stacks/vault-consul/production/env.hcl → production
+  # stacks/vault-consul/ministack/env.hcl  → ministack
+  _env_name = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
+  env_cfg   = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
 
   project = local.common.locals.project
   region  = local.common.locals.region

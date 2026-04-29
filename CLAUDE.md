@@ -7,14 +7,19 @@ AWS infra for payments-app. Runs on MiniStack (local) or real AWS. Terragrunt or
 ```
 root.hcl              — root config: provider/backend generation, versions
 common.hcl            — shared locals: project="terragrunt-infra", region="ap-southeast-1"
-local.hcl             — active_env: "ministack" | "aws"  ← switch with make ms-enable/ms-disable
-envs/ministack.hcl    — ministack feature flags (use_ministack=true, nat disabled, github-runner disabled)
-envs/aws.hcl          — aws feature flags (all enabled)
+envs/
+  production.hcl      — production feature flags (real AWS, all features on)
+  ministack.hcl       — ministack feature flags (use_ministack=true, nat disabled, github-runner disabled)
 _common/
-  vault_provider.hcl  — shared Vault dependency + port-forward hook + vault/k8s providers
+  vault_provider.hcl  — shared Vault token fetch (SSM) + port-forward hook + vault/k8s providers
   k8s_providers.hcl   — shared EKS dependency + helm/kubernetes providers
 stacks/vault-consul/
-  terragrunt.stack.hcl — stack definition (7 layers, all units)
+  production/
+    env.hcl                — locals { name = "production" }
+    terragrunt.stack.hcl   — stack definition (7 layers, all units)
+  ministack/
+    env.hcl                — locals { name = "ministack" }
+    terragrunt.stack.hcl   — stack definition (6 layers, no github-runner)
 units/<name>/         — individual Terraform modules (main.tf, variables.tf, outputs.tf, terragrunt.hcl)
 gitops/
   appset.yaml         — ArgoCD ApplicationSet (4 waves)
@@ -43,16 +48,16 @@ Wave 1: consul → Wave 2: aws-alb + datadog → Wave 3: flagger → Wave 4: pay
 ## Key Commands
 
 ```bash
-# Local dev
-make ms-bootstrap          # Full bootstrap from scratch (~4 min)
-make ms-enable / ms-disable # Switch active_env in local.hcl
-make ms-up / ms-down        # Docker compose up/down
-make ms-reset               # Clear MiniStack state via API
-make ms-seed                # Create S3 bucket + DynamoDB lock table
-make ms-kubeconfig          # Write .kubeconfig-ministack from k3s container
+# Local dev (MiniStack)
+make ms-bootstrap                      # Full bootstrap from scratch (~4 min)
+make ms-up / ms-down                   # Docker compose up/down
+make ms-reset                          # Clear MiniStack state via API
+make ms-seed                           # Create S3 bucket + DynamoDB lock table
+make ms-kubeconfig                     # Write .kubeconfig-ministack from k3s container
 
-# Stack
-make stack-vault apply|plan|destroy
+# Stack — env determined by target name, no flag needed
+make stack-vault-production apply|plan|destroy
+make stack-vault-ministack  apply|plan|destroy
 
 # Units
 make apply-<unit> / plan-<unit> / destroy-<unit>
@@ -61,20 +66,25 @@ make apply-<unit> / plan-<unit> / destroy-<unit>
 make vault-status / vault-db-creds / vault-pki-roots / vault-rotate-db
 
 # GitOps
-make gitops-bootstrap       # kubectl apply gitops/appset.yaml
+make gitops-bootstrap                  # kubectl apply gitops/appset.yaml
 
 # Utility
-make tg-clean               # rm .terragrunt-cache / .terraform dirs
-make fmt                    # terraform fmt -recursive units/
-source load_env.sh          # Export KUBECONFIG, VAULT_ADDR, etc.
+make tg-clean                          # rm .terragrunt-cache / .terraform dirs
+make fmt                               # terraform fmt -recursive units/
+source load_env.sh production          # Export KUBECONFIG, VAULT_ADDR, etc.
+source load_env.sh ministack           # Same for local dev
 ```
 
-## Environment Toggle
+## Environment Detection
 
-`local.hcl` holds `active_env`. `root.hcl` reads it → selects provider, backend, and feature flags.
+No toggle file. Env is determined by **which stack directory you run from**:
+- `stacks/vault-consul/production/` → reads `production/env.hcl` → loads `envs/production.hcl`
+- `stacks/vault-consul/ministack/`  → reads `ministack/env.hcl`  → loads `envs/ministack.hcl`
 
+`root.hcl` uses `find_in_parent_folders("env.hcl")` to resolve the env automatically.
+
+- **production**: real AWS credentials, all features on
 - **ministack**: endpoint=http://localhost:4566, creds=test/test, no NAT, no github-runner
-- **aws**: real AWS credentials from CLI/instance profile, all features on
 
 ## _common Includes
 
@@ -94,4 +104,4 @@ Units include `_common/vault_provider.hcl` or `_common/k8s_providers.hcl` via `r
 ## Provider Versions
 
 - aws ~> 5.0, helm ~> 2.0, kubernetes ~> 2.0, vault ~> 4.0, tls ~> 4.0
-- terraform >= 1.7, terragrunt >= 0.77
+- terraform >= 1.7, terragrunt >= 1.0.2

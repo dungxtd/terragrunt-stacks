@@ -8,22 +8,21 @@ TG_FLAGS := --non-interactive --backend-bootstrap
 # ── Stack ───────────────────────────────────────────────────────
 # Usage: make stack-<name> <plan|apply|destroy>
 
-STACKS_MAP := vault:vault-consul
+# Stack targets: make stack-vault-<env> <plan|apply|destroy>
+# Env detected automatically from directory path — no active_env flag needed.
 
 define stack-rule
-.PHONY: stack-$(1) stack-$(1)-generate
-stack-$(1)-generate:
-	cd $(STACKS)/$2 && terragrunt stack generate $(TG_FLAGS)
-stack-$(1):
+.PHONY: stack-$(1)-$(2) stack-$(1)-$(2)-generate
+stack-$(1)-$(2)-generate:
+	cd $(STACKS)/$(3)/$(2) && terragrunt stack generate $(TG_FLAGS)
+stack-$(1)-$(2):
 	$$(eval ACTION := $$(filter plan apply destroy,$$(MAKECMDGOALS)))
-	@if [ -z "$$(ACTION)" ]; then echo "Usage: make stack-$(1) <plan|apply|destroy>"; exit 1; fi
-	cd $(STACKS)/$2 && terragrunt stack generate $(TG_FLAGS) && terragrunt stack run $$(ACTION) $(TG_FLAGS)
-	@if [ "$$(ACTION)" = "apply" ] && [ -f .kubeconfig-ministack ]; then \
-		echo ""; \
-		echo "  KUBECONFIG: export KUBECONFIG=$$(pwd)/.kubeconfig-ministack"; \
-	fi
+	@if [ -z "$$(ACTION)" ]; then echo "Usage: make stack-$(1)-$(2) <plan|apply|destroy>"; exit 1; fi
+	cd $(STACKS)/$(3)/$(2) && terragrunt stack generate $(TG_FLAGS) && terragrunt stack run $$(ACTION) $(TG_FLAGS)
 endef
-$(foreach s,$(STACKS_MAP),$(eval $(call stack-rule,$(word 1,$(subst :, ,$s)),$(word 2,$(subst :, ,$s)))))
+
+$(eval $(call stack-rule,vault,production,vault-consul))
+$(eval $(call stack-rule,vault,ministack,vault-consul))
 
 .PHONY: plan apply destroy
 plan apply destroy: ;@:
@@ -155,7 +154,6 @@ clean-all: clean-helm
 MINISTACK_NAME          := ministack
 MINISTACK_PORT          := 4566
 MINISTACK_EP            := http://localhost:$(MINISTACK_PORT)
-LOCAL_HCL               := local.hcl
 STATE_BUCKET            := tf-state-$(APP)-us-east-1
 MINISTACK_EKS_CONTAINER := ministack-eks-terragrunt-infra-eks
 MINISTACK_KUBECONFIG    := .kubeconfig-ministack
@@ -188,16 +186,6 @@ ms-reset:
 	@echo "Resetting all MiniStack state..."
 	@curl -sf -X POST $(MINISTACK_EP)/_ministack/reset > /dev/null && echo "✓ MiniStack state cleared" || echo "✗ Reset failed"
 
-.PHONY: ms-enable
-ms-enable: tg-clean
-	@sed -i.bak 's/active_env = "aws"/active_env = "ministack"/' $(LOCAL_HCL) && rm -f $(LOCAL_HCL).bak
-	@echo "✓ Switched to ministack env in $(LOCAL_HCL)"
-
-.PHONY: ms-disable
-ms-disable: tg-clean
-	@sed -i.bak 's/active_env = "ministack"/active_env = "aws"/' $(LOCAL_HCL) && rm -f $(LOCAL_HCL).bak
-	@echo "✓ Switched to aws env in $(LOCAL_HCL)"
-
 .PHONY: ms-seed
 ms-seed: ms-up
 	@echo "Creating S3 state bucket and DynamoDB lock table..."
@@ -228,7 +216,7 @@ ms-test: ms-up
 		aws --endpoint-url $(MINISTACK_EP) ec2 describe-vpcs > /dev/null 2>&1 && echo "✓ EC2 OK" || echo "✗ EC2 failed"
 
 .PHONY: ms-init
-ms-init: ms-up ms-enable ms-seed
+ms-init: ms-up ms-seed
 	@echo ""
 	@echo "══════════════════════════════════════════════════"
 	@echo "  MiniStack local environment is ready!"
@@ -241,7 +229,7 @@ ms-init: ms-up ms-enable ms-seed
 ms-bootstrap: tg-clean ms-reset ms-seed
 	@echo ""
 	@echo "═══ Deploying infrastructure stack… ═══"
-	@cd $(STACKS)/vault-consul && terragrunt stack generate && terragrunt stack run apply $(TG_FLAGS)
+	@cd $(STACKS)/vault-consul/ministack && terragrunt stack generate && terragrunt stack run apply $(TG_FLAGS)
 	@echo ""
 	@echo "═══ Bootstrapping GitOps… ═══"
 	@KUBECONFIG=$(shell pwd)/.kubeconfig-ministack kubectl apply -f $(GITOPS_DIR)/appset.yaml || true
@@ -259,7 +247,7 @@ ms-bootstrap: tg-clean ms-reset ms-seed
 	@echo "══════════════════════════════════════════════════"
 
 .PHONY: ms-teardown
-ms-teardown: ms-disable ms-down
+ms-teardown: ms-down
 	@echo "✓ Local environment torn down"
 
 GITOPS_DIR          := gitops
