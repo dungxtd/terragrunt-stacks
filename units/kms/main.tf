@@ -13,6 +13,9 @@ resource "aws_kms_key" "vault_unseal" {
 }
 
 data "aws_iam_policy_document" "vault_unseal" {
+  #checkov:skip=CKV_AWS_109:KMS root admin requires kms:* to prevent key lockout
+  #checkov:skip=CKV_AWS_111:KMS root admin requires kms:* to prevent key lockout
+  #checkov:skip=CKV_AWS_356:KMS key policy resource must be * per AWS requirements
   statement {
     sid    = "RootAdmin"
     effect = "Allow"
@@ -54,6 +57,9 @@ resource "aws_kms_key" "sops" {
 }
 
 data "aws_iam_policy_document" "sops" {
+  #checkov:skip=CKV_AWS_109:KMS root admin requires kms:* to prevent key lockout
+  #checkov:skip=CKV_AWS_111:KMS root admin requires kms:* to prevent key lockout
+  #checkov:skip=CKV_AWS_356:KMS key policy resource must be * per AWS requirements
   statement {
     sid    = "RootAdmin"
     effect = "Allow"
@@ -96,6 +102,9 @@ resource "aws_kms_key" "tf_state" {
 }
 
 data "aws_iam_policy_document" "tf_state" {
+  #checkov:skip=CKV_AWS_109:KMS root admin requires kms:* to prevent key lockout
+  #checkov:skip=CKV_AWS_111:KMS root admin requires kms:* to prevent key lockout
+  #checkov:skip=CKV_AWS_356:KMS key policy resource must be * per AWS requirements
   statement {
     sid    = "RootAdmin"
     effect = "Allow"
