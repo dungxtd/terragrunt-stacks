@@ -1,8 +1,43 @@
+data "aws_caller_identity" "current" {}
+
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+}
+
 resource "aws_kms_key" "vault_unseal" {
   description             = "Vault auto-unseal key"
   deletion_window_in_days = 10
   enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.vault_unseal.json
   tags                    = merge(var.tags, { Purpose = "vault-unseal" })
+}
+
+data "aws_iam_policy_document" "vault_unseal" {
+  statement {
+    sid    = "RootAdmin"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${local.account_id}:root"]
+    }
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "VaultUnseal"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${local.account_id}:role/terragrunt-deploy"]
+    }
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_kms_alias" "vault_unseal" {
@@ -14,7 +49,37 @@ resource "aws_kms_key" "sops" {
   description             = "SOPS secrets encryption key"
   deletion_window_in_days = 10
   enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.sops.json
   tags                    = merge(var.tags, { Purpose = "sops-secrets" })
+}
+
+data "aws_iam_policy_document" "sops" {
+  statement {
+    sid    = "RootAdmin"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${local.account_id}:root"]
+    }
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "SopsEncryptDecrypt"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${local.account_id}:role/terragrunt-deploy"]
+    }
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:GenerateDataKey",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_kms_alias" "sops" {
@@ -26,7 +91,37 @@ resource "aws_kms_key" "tf_state" {
   description             = "Terraform state encryption key"
   deletion_window_in_days = 10
   enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.tf_state.json
   tags                    = merge(var.tags, { Purpose = "tf-state" })
+}
+
+data "aws_iam_policy_document" "tf_state" {
+  statement {
+    sid    = "RootAdmin"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${local.account_id}:root"]
+    }
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "TerraformStateEncrypt"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${local.account_id}:role/terragrunt-deploy"]
+    }
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:GenerateDataKey",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_kms_alias" "tf_state" {
