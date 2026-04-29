@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 # Set environment variables for the active environment.
 # Works with both MiniStack (local) and AWS (production).
-# Usage: source set_env.sh
+# Usage: source load_env.sh
 
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 STACK_DIR="$SCRIPT_DIR/stacks/vault-consul/.terragrunt-stack"
 
 # Detect active environment
@@ -35,8 +33,9 @@ export ARGOCD_ADMIN_PASS=$(KUBECONFIG="${KUBECONFIG:-}" kubectl get secrets -n a
 
 echo "Environment ($ACTIVE_ENV):"
 echo "  KUBECONFIG=$KUBECONFIG"
-echo "  VAULT_ADDR=$VAULT_ADDR"
+echo "  VAULT_ADDR=$VAULT_ADDR  (requires: kubectl port-forward svc/vault 18200:8200 -n vault)"
+echo "  VAULT_TOKEN=$VAULT_TOKEN"
 echo "  ARGOCD_SERVER=$ARGOCD_SERVER"
-echo "  ARGOCD_ADMIN_PASS=$ARGOCD_ADMIN_PASS"
+echo "  ARGOCD_ADMIN_PASS=$ARGOCD_ADMIN_PASS  (user: admin)"
 echo "  AWS_REGION=$AWS_REGION"
 echo "  EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME"
