@@ -1,6 +1,6 @@
 module "rds" {
   source  = "terraform-aws-modules/rds/aws"
-  version = "~> 6.0"
+  version = "~> 7.2"
 
   identifier = "${var.project}-payments"
 
@@ -25,7 +25,7 @@ module "rds" {
 
   backup_retention_period = var.backup_retention_period
   deletion_protection     = var.deletion_protection
-  skip_final_snapshot     = true
+  skip_final_snapshot     = var.skip_final_snapshot
 
   performance_insights_enabled = var.performance_insights
   monitoring_interval          = var.monitoring_interval

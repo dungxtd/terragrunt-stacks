@@ -2,31 +2,17 @@ resource "helm_release" "datadog" {
   name             = "datadog"
   repository       = "https://helm.datadoghq.com"
   chart            = "datadog"
+  version          = "3.202.1"
   namespace        = "datadog"
   create_namespace = true
 
-  set {
-    name  = "datadog.apiKey"
-    value = var.datadog_api_key
-  }
-
-  set {
-    name  = "datadog.site"
-    value = var.datadog_site
-  }
-
-  set {
-    name  = "datadog.logs.enabled"
-    value = "true"
-  }
-
-  set {
-    name  = "datadog.apm.portEnabled"
-    value = "true"
-  }
-
-  set {
-    name  = "datadog.processAgent.enabled"
-    value = "true"
-  }
+  values = [yamlencode({
+    datadog = {
+      apiKey = var.datadog_api_key
+      site   = var.datadog_site
+      logs   = { enabled = true }
+      apm    = { portEnabled = true }
+      processAgent = { enabled = true }
+    }
+  })]
 }

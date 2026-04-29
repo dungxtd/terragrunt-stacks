@@ -49,6 +49,12 @@ variable "update_launch_template_default_version" {
   default     = true
 }
 
+variable "use_latest_ami_release_version" {
+  description = "Use latest AMI release version (looks up SSM param). Disable for MiniStack."
+  type        = bool
+  default     = true
+}
+
 variable "node_instance_types" {
   description = "EC2 instance types for EKS managed node group"
   type        = list(string)

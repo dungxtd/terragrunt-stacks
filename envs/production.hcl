@@ -15,6 +15,7 @@ locals {
   create_cluster_addons                    = true
   enable_cluster_creator_admin_permissions = true
   update_launch_template_default_version   = true
+  use_latest_ami_release_version           = true
   eks_node_instance_types                  = ["t3.medium"]
   eks_node_min_size                        = 1
   eks_node_max_size                        = 3
@@ -29,6 +30,7 @@ locals {
   rds_deletion_protection     = false
   rds_performance_insights    = false
   rds_monitoring_interval     = 0
+  rds_skip_final_snapshot     = false
   rds_create_monitoring_role  = false
   rds_instance_class          = "db.t3.micro"
   rds_backup_retention_period = 0
@@ -37,4 +39,24 @@ locals {
 
   # GitHub Actions Runner
   enable_github_runner = true
+
+  # ── Resolved env-specific values ─────────────────────────────
+  # Units read these directly — no ternaries needed.
+
+  kubeconfig_path     = pathexpand("~/.kube/config")
+  kubeconfig_hook_cmd = "aws eks update-kubeconfig --name terragrunt-infra-eks --region ap-southeast-1 && echo '✓ aws kubeconfig ready'"
+
+  # Vault
+  vault_mode      = "ha"
+  dev_root_token  = ""
+  ssm_endpoint    = ""
+  vault_token_cmd = "aws ssm get-parameter --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text"
+
+  # ArgoCD
+  argocd_service_type = "LoadBalancer"
+
+  # DB: no overrides — use real RDS outputs
+  rds_endpoint_override = ""
+  rds_username_override = ""
+  rds_password_override = ""
 }

@@ -2,18 +2,14 @@ resource "helm_release" "flagger" {
   name             = "flagger"
   repository       = "https://flagger.app"
   chart            = "flagger"
+  version          = "1.42.0"
   namespace        = "flagger-system"
   create_namespace = true
 
-  set {
-    name  = "meshProvider"
-    value = var.mesh_provider
-  }
-
-  set {
-    name  = "metricsServer"
-    value = var.metrics_server
-  }
+  values = [yamlencode({
+    meshProvider = var.mesh_provider
+    metricsServer = var.metrics_server
+  })]
 }
 
 resource "helm_release" "flagger_loadtester" {
@@ -22,6 +18,7 @@ resource "helm_release" "flagger_loadtester" {
   name             = "flagger-loadtester"
   repository       = "https://flagger.app"
   chart            = "loadtester"
+  version          = "0.34.0"
   namespace        = "flagger-system"
   create_namespace = true
 

@@ -2,6 +2,7 @@ resource "helm_release" "linkerd_crds" {
   name             = "linkerd-crds"
   repository       = "https://helm.linkerd.io/edge"
   chart            = "linkerd-crds"
+  version          = "2026.4.3"
   namespace        = "linkerd"
   create_namespace = true
   timeout          = 600
@@ -60,52 +61,36 @@ resource "tls_locally_signed_cert" "issuer" {
   ]
 }
 
+locals {
+  linkerd_external_ca_yaml = var.external_ca ? yamlencode({
+    identity = {
+      externalCA = true
+      issuer     = { scheme = "kubernetes.io/tls" }
+    }
+  }) : ""
+
+  linkerd_self_signed_yaml = var.external_ca ? "" : yamlencode({
+    identityTrustAnchorsPEM = tls_self_signed_cert.trust_anchor[0].cert_pem
+    identity = {
+      issuer = {
+        tls = {
+          crtPEM = tls_locally_signed_cert.issuer[0].cert_pem
+          keyPEM = tls_private_key.issuer[0].private_key_pem
+        }
+      }
+    }
+  })
+}
+
 resource "helm_release" "linkerd_control_plane" {
   name       = "linkerd-control-plane"
   repository = "https://helm.linkerd.io/edge"
   chart      = "linkerd-control-plane"
+  version    = "2026.4.3"
   namespace  = "linkerd"
   timeout    = 600
 
-  dynamic "set" {
-    for_each = var.external_ca ? [1] : []
-    content {
-      name  = "identity.externalCA"
-      value = true
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.external_ca ? [1] : []
-    content {
-      name  = "identity.issuer.scheme"
-      value = "kubernetes.io/tls"
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.external_ca ? [] : [1]
-    content {
-      name  = "identityTrustAnchorsPEM"
-      value = tls_self_signed_cert.trust_anchor[0].cert_pem
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.external_ca ? [] : [1]
-    content {
-      name  = "identity.issuer.tls.crtPEM"
-      value = tls_locally_signed_cert.issuer[0].cert_pem
-    }
-  }
-
-  dynamic "set" {
-    for_each = var.external_ca ? [] : [1]
-    content {
-      name  = "identity.issuer.tls.keyPEM"
-      value = tls_private_key.issuer[0].private_key_pem
-    }
-  }
+  values = compact([local.linkerd_external_ca_yaml, local.linkerd_self_signed_yaml])
 
   depends_on = [helm_release.linkerd_crds]
 }
@@ -116,6 +101,7 @@ resource "helm_release" "linkerd_viz" {
   name             = "linkerd-viz"
   repository       = "https://helm.linkerd.io/edge"
   chart            = "linkerd-viz"
+  version          = "2026.4.3"
   namespace        = "linkerd-viz"
   create_namespace = true
   timeout          = 600

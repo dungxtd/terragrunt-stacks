@@ -6,11 +6,9 @@
 #   aws       → config_path = ~/.kube/config                (run: make kubeconfig)
 
 locals {
-  _env_name      = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
-  _env_cfg       = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
-  _use_ministack = local._env_cfg.locals.use_ministack
-
-  _kubeconfig_path = local._use_ministack ? "${get_repo_root()}/.kubeconfig-ministack" : "~/.kube/config"
+  _env_name        = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
+  _env_cfg         = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
+  _kubeconfig_path = local._env_cfg.locals.kubeconfig_path
 }
 
 dependency "eks" {
@@ -29,7 +27,7 @@ generate "k8s_providers" {
   if_exists = "overwrite_terragrunt"
   contents  = <<-EOF
     provider "helm" {
-      kubernetes {
+      kubernetes = {
         config_path = "${local._kubeconfig_path}"
       }
     }

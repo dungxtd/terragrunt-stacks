@@ -21,13 +21,14 @@ resource "helm_release" "argocd" {
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argo-cd"
+  version          = "9.5.7"
   namespace        = "argocd"
   create_namespace = true
 
   values = [yamlencode({
     server = {
       service = {
-        type = var.use_ministack ? "NodePort" : "LoadBalancer"
+        type = var.service_type
       }
       additionalProjects = [for p in local.app_projects : {
         name        = p.name

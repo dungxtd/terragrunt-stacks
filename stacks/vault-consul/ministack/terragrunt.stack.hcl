@@ -55,4 +55,9 @@ unit "argocd" {
   path   = "argocd"
 }
 
-# github-runner disabled for ministack (no ARC support locally)
+# ── Layer 7: CI/CD Runner ────────────────────────────────────────
+
+unit "github_runner" {
+  source = "../../../units/github-runner"
+  path   = "github-runner"
+}

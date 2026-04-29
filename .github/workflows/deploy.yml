@@ -13,8 +13,8 @@ permissions:
 
 env:
   AWS_REGION: ap-southeast-1
-  TF_VERSION: "1.10.5"
-  TG_VERSION: "1.0.2"
+  TF_VERSION: "1.12.2"
+  TG_VERSION: "1.0.3"
   TG_FLAGS: --non-interactive --backend-bootstrap
   STATE_BUCKET: tf-state-terragrunt-stacks
   STATE_PREFIX: stacks/vault-consul/production
@@ -56,6 +56,12 @@ jobs:
 
       - name: Generate stack
         run: make stack-vault-production-generate
+
+      - name: Validate stack
+        run: |
+          cd stacks/vault-consul/production
+          terragrunt run --all validate ${{ env.TG_FLAGS }} 2>&1 | tee validate.log
+          echo "✓ stack validate passed"
 
       - name: Policy as code (Checkov)
         uses: bridgecrewio/checkov-action@v12
