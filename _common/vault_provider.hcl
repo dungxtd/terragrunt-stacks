@@ -25,7 +25,7 @@ dependency "vault" {
     vault_address    = "http://vault.vault.svc.cluster.local:8200"
     vault_root_token = "mock-token"
   }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["validate", "plan", "destroy"]
   mock_outputs_merge_strategy_with_state  = "shallow"
 }
 
