@@ -1,0 +1,87 @@
+name: Destroy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm'
+        required: true
+      force_unlock:
+        description: "Force-unlock stale state locks before destroying"
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-1
+  TF_VERSION: "1.10.5"
+  TG_VERSION: "1.0.2"
+  TG_FLAGS: --non-interactive --backend-bootstrap
+  STATE_BUCKET: tf-state-terragrunt-stacks
+  STATE_PREFIX: stacks/vault-consul
+  STATE_UNITS: vpc eks kms rds vault certs vault-config linkerd argocd github-runner
+
+jobs:
+  destroy:
+    name: Destroy
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'destroy'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64" \
+            -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+
+      - name: Ensure AWS env active
+        run: make ms-disable
+
+      - name: Force-unlock stale locks
+        if: github.event.inputs.force_unlock == 'true'
+        run: |
+          echo "Scanning for stale locks in DynamoDB..."
+          LOCKS=$(aws dynamodb scan \
+            --table-name tf-state-lock \
+            --filter-expression "begins_with(LockID, :prefix)" \
+            --expression-attribute-values "{\":prefix\":{\"S\":\"${STATE_BUCKET}/${STATE_PREFIX}\"}}" \
+            --query "Items[].LockID.S" \
+            --output text)
+
+          if [ -z "$LOCKS" ]; then
+            echo "No locks found."
+          else
+            for LOCK_ID in $LOCKS; do
+              echo "Deleting lock: $LOCK_ID"
+              aws dynamodb delete-item \
+                --table-name tf-state-lock \
+                --key "{\"LockID\":{\"S\":\"${LOCK_ID}\"}}"
+            done
+            echo "All locks cleared."
+          fi
+
+      - name: Terragrunt destroy
+        env:
+          GITHUB_CONFIG_URL: ${{ secrets.GITHUB_CONFIG_URL }}
+          GITHUB_APP_ID: ${{ secrets.ARC_APP_ID }}
+          GITHUB_APP_INSTALLATION_ID: ${{ secrets.ARC_APP_INSTALLATION_ID }}
+          GITHUB_APP_PRIVATE_KEY: ${{ secrets.ARC_APP_PRIVATE_KEY }}
+        run: make stack-vault destroy
