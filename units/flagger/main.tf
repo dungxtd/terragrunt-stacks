@@ -7,7 +7,7 @@ resource "helm_release" "flagger" {
   create_namespace = true
 
   values = [yamlencode({
-    meshProvider = var.mesh_provider
+    meshProvider  = var.mesh_provider
     metricsServer = var.metrics_server
   })]
 }

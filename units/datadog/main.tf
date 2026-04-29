@@ -8,10 +8,10 @@ resource "helm_release" "datadog" {
 
   values = [yamlencode({
     datadog = {
-      apiKey = var.datadog_api_key
-      site   = var.datadog_site
-      logs   = { enabled = true }
-      apm    = { portEnabled = true }
+      apiKey       = var.datadog_api_key
+      site         = var.datadog_site
+      logs         = { enabled = true }
+      apm          = { portEnabled = true }
       processAgent = { enabled = true }
     }
   })]
