@@ -25,3 +25,20 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "use_ministack" {
+  description = "Running against MiniStack (localstack)"
+  type        = bool
+  default     = false
+}
+
+variable "ssm_endpoint" {
+  description = "SSM endpoint override for MiniStack"
+  type        = string
+  default     = ""
+}
+
+variable "kubeconfig_path" {
+  description = "Path to kubeconfig used by kubectl in init null_resource"
+  type        = string
+}
