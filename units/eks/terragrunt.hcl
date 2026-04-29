@@ -33,17 +33,13 @@ inputs = {
 terraform {
   after_hook "gen_kubeconfig_ministack" {
     commands     = ["apply"]
-    execute      = ["bash", "-c",
-      "docker exec ministack-eks-terragrunt-infra-eks cat /etc/rancher/k3s/k3s.yaml 2>/dev/null | sed 's|127.0.0.1|localhost|g' > ${get_repo_root()}/.kubeconfig-ministack && echo '✓ ministack kubeconfig ready' || true"
-    ]
+    execute      = ["bash", "-c", "docker exec ministack-eks-terragrunt-infra-eks cat /etc/rancher/k3s/k3s.yaml 2>/dev/null | sed 's|127.0.0.1|localhost|g' > ${get_repo_root()}/.kubeconfig-ministack && echo '✓ ministack kubeconfig ready' || true"]
     run_on_error = false
   }
 
   after_hook "gen_kubeconfig_aws" {
     commands     = ["apply"]
-    execute      = ["bash", "-c",
-      "aws eks update-kubeconfig --name terragrunt-infra-eks --region ap-southeast-1 2>/dev/null && echo '✓ aws kubeconfig ready' || true"
-    ]
+    execute      = ["bash", "-c", "aws eks update-kubeconfig --name terragrunt-infra-eks --region ap-southeast-1 2>/dev/null && echo '✓ aws kubeconfig ready' || true"]
     run_on_error = false
   }
 }

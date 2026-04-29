@@ -288,5 +288,7 @@ tg-clean:
 	@echo "✓ Cache cleared"
 
 .PHONY: fmt graph-vault
-fmt:        ; terraform fmt -recursive $(UNITS)
+fmt:
+	terraform fmt -recursive $(UNITS)
+	terragrunt hcl fmt
 graph-vault:; cd $(STACKS)/vault-consul && terragrunt graph-dependencies

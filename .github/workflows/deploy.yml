@@ -44,7 +44,12 @@ jobs:
         run: make ms-disable
 
       - name: Check HCL formatting
-        run: terragrunt hclfmt --terragrunt-check --terragrunt-diff
+        run: |
+          terragrunt hcl fmt
+          git diff --exit-code || {
+            echo "HCL files need formatting. Run: make fmt"
+            exit 1
+          }
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4

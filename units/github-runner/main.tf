@@ -1,6 +1,6 @@
 locals {
-  controller_namespace  = "arc-systems"
-  runner_namespace      = "arc-runners"
+  controller_namespace = "arc-systems"
+  runner_namespace     = "arc-runners"
 
   # Auth: prefer GitHub App, fallback to PAT
   use_github_app = var.github_app_id != "" && var.github_app_private_key != ""
@@ -93,8 +93,8 @@ resource "helm_release" "arc_runner_set" {
       spec = {
         serviceAccountName = kubernetes_service_account.runner[0].metadata[0].name
         containers = [{
-          name  = "runner"
-          image = "ghcr.io/actions/actions-runner:latest"
+          name    = "runner"
+          image   = "ghcr.io/actions/actions-runner:latest"
           command = ["/home/runner/run.sh"]
           resources = {
             requests = {
