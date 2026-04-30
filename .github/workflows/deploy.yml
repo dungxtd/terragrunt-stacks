@@ -3,8 +3,12 @@ name: Deploy Infrastructure
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - ".github/workflows/destroy.yml"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - ".github/workflows/destroy.yml"
   workflow_dispatch:
     inputs:
       apply:
