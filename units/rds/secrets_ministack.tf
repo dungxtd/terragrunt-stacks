@@ -6,6 +6,8 @@
 # units (vault-config, app units) keep a single read path.
 
 resource "aws_secretsmanager_secret" "master_override" {
+  # checkov:skip=CKV_AWS_149: ministack-only; LocalStack KMS not used. Production path uses RDS-managed secret with default AWS-managed key.
+  # checkov:skip=CKV2_AWS_57: ministack-only static dev credential; rotation not applicable to LocalStack/host Postgres.
   count                   = local.use_managed_password ? 0 : 1
   name                    = "${var.project}-rds-master-override"
   recovery_window_in_days = 0
