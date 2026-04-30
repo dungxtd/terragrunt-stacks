@@ -83,7 +83,7 @@ locals {
   enable_cluster_creator_admin_permissions = false
   update_launch_template_default_version   = false
   use_latest_ami_release_version           = false
-  eks_kubernetes_version                    = "1.32"
+  eks_kubernetes_version                   = "1.32"
   eks_node_instance_types                  = ["t3.medium"]
   eks_node_min_size                        = 1
   eks_node_max_size                        = 3
