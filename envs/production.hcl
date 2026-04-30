@@ -16,14 +16,14 @@ locals {
   enable_cluster_creator_admin_permissions = true
   update_launch_template_default_version   = true
   use_latest_ami_release_version           = true
-  eks_node_instance_types                  = ["t3.medium"]
+  eks_node_instance_types                  = ["t3.small"]
   eks_node_min_size                        = 1
-  eks_node_max_size                        = 3
-  eks_node_desired_size                    = 2
+  eks_node_max_size                        = 2
+  eks_node_desired_size                    = 1
 
-  # VPC
+  # VPC — single NAT to cut cost (~$32/mo vs ~$96/mo for 3 AZs)
   enable_nat_gateway = true
-  single_nat_gateway = false
+  single_nat_gateway = true
 
   # RDS
   rds_multi_az                = false
@@ -37,8 +37,8 @@ locals {
   rds_allocated_storage       = 20
   rds_max_allocated_storage   = 20
 
-  # GitHub Actions Runner
-  enable_github_runner = true
+  # GitHub Actions Runner — disabled for freetear single-node (would saturate 1 t3.small)
+  enable_github_runner = false
 
   # ── Resolved env-specific values ─────────────────────────────
   # Units read these directly — no ternaries needed.
@@ -46,14 +46,14 @@ locals {
   kubeconfig_path     = pathexpand("~/.kube/config")
   kubeconfig_hook_cmd = "aws eks update-kubeconfig --name terragrunt-infra-eks --region ap-southeast-1 && echo '✓ aws kubeconfig ready'"
 
-  # Vault
-  vault_mode      = "ha"
-  dev_root_token  = ""
+  # Vault — dev mode for freetear (no PVC, single replica). Switch to "ha" for real prod.
+  vault_mode      = "dev"
+  dev_root_token  = "root"
   ssm_endpoint    = ""
-  vault_token_cmd = "aws ssm get-parameter --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text 2>/dev/null || echo 'VAULT_TOKEN_NOT_YET_AVAILABLE'"
+  vault_token_cmd = "aws ssm get-parameter --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text 2>/dev/null || echo root"
 
-  # ArgoCD
-  argocd_service_type = "LoadBalancer"
+  # ArgoCD — NodePort to skip $16/mo NLB. Use kubectl port-forward to access.
+  argocd_service_type = "NodePort"
 
   # DB: no overrides — use real RDS outputs
   rds_endpoint_override = ""
