@@ -1,3 +1,7 @@
+locals {
+  use_managed_password = var.master_password_override == ""
+}
+
 module "rds" {
   source  = "terraform-aws-modules/rds/aws"
   version = "~> 7.2"
@@ -17,7 +21,8 @@ module "rds" {
   username = "postgres"
   port     = 5432
 
-  manage_master_user_password = true
+  manage_master_user_password = local.use_managed_password
+  password                    = local.use_managed_password ? null : var.master_password_override
 
   multi_az               = var.multi_az
   db_subnet_group_name   = var.database_subnet_group_name

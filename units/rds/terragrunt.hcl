@@ -35,4 +35,6 @@ inputs = {
   allocated_storage       = local.env_cfg.locals.rds_allocated_storage
   max_allocated_storage   = local.env_cfg.locals.rds_max_allocated_storage
   skip_final_snapshot     = local.env_cfg.locals.rds_skip_final_snapshot
+
+  master_password_override = local.env_cfg.locals.rds_password_override
 }

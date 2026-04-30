@@ -78,6 +78,13 @@ variable "skip_final_snapshot" {
   default     = true
 }
 
+variable "master_password_override" {
+  description = "Plaintext master password. Set ONLY for ministack/LocalStack where AWS-managed secrets aren't usable. Empty in production — RDS auto-generates and stores in Secrets Manager."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "tags" {
   description = "Common tags"
   type        = map(string)

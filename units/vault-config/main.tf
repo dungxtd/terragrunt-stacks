@@ -24,10 +24,15 @@ resource "vault_transit_secret_backend_key" "payments" {
 
 # ── Database Secrets Engine ──────────────────────────────────────
 
+data "aws_secretsmanager_secret_version" "rds_master" {
+  secret_id     = var.rds_master_secret_arn
+  version_stage = "AWSCURRENT"
+}
+
 locals {
   db_endpoint = var.rds_endpoint
   db_username = var.rds_username
-  db_password = var.rds_password
+  db_password = jsondecode(data.aws_secretsmanager_secret_version.rds_master.secret_string)["password"]
 }
 
 resource "vault_mount" "database" {

@@ -24,10 +24,9 @@ variable "rds_username" {
   type        = string
 }
 
-variable "rds_password" {
-  description = "RDS master password"
+variable "rds_master_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding {username,password} for the RDS master user. Sourced from the rds unit output."
   type        = string
-  sensitive   = true
 }
 
 variable "payments_processor_password" {
