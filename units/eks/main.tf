@@ -33,9 +33,19 @@ module "eks" {
   }
 
   addons = var.create_cluster_addons ? {
-    vpc-cni    = { most_recent = true, before_compute = true }
-    kube-proxy = { most_recent = true, before_compute = true }
-    coredns    = { most_recent = true }
+    vpc-cni = {
+      most_recent    = true
+      before_compute = true
+      configuration_values = jsonencode({
+        env = {
+          ENABLE_PREFIX_DELEGATION = "true"
+          WARM_PREFIX_TARGET       = "1"
+        }
+      })
+    }
+    eks-pod-identity-agent = { most_recent = true, before_compute = true }
+    kube-proxy             = { most_recent = true }
+    coredns                = { most_recent = true }
   } : {}
 
   tags = var.tags

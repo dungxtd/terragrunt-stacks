@@ -17,9 +17,9 @@ locals {
   update_launch_template_default_version   = true
   use_latest_ami_release_version           = true
   eks_node_instance_types                  = ["t3.small"]
-  eks_node_min_size                        = 1
-  eks_node_max_size                        = 2
-  eks_node_desired_size                    = 1
+  eks_node_min_size                        = 3
+  eks_node_max_size                        = 5
+  eks_node_desired_size                    = 3
 
   # VPC — single NAT to cut cost (~$32/mo vs ~$96/mo for 3 AZs)
   enable_nat_gateway = true
