@@ -29,6 +29,12 @@ variable "rds_master_secret_arn" {
   type        = string
 }
 
+variable "db_ssl_mode" {
+  description = "PostgreSQL sslmode for Vault DB connection. Use 'verify-full' in production once RDS CA bundle is mounted in Vault pods."
+  type        = string
+  default     = "require"
+}
+
 variable "payments_processor_password" {
   description = "Static password for payments-processor"
   type        = string

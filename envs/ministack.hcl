@@ -20,6 +20,8 @@ locals {
   eks_node_min_size                        = 1
   eks_node_max_size                        = 3
   eks_node_desired_size                    = 2
+  eks_endpoint_public_access_cidrs         = ["0.0.0.0/0"]
+  eks_cluster_enabled_log_types            = ["api", "audit", "authenticator"]
 
   # VPC: NAT Gateways are not functional in MiniStack
   enable_nat_gateway = false
@@ -59,4 +61,5 @@ locals {
   rds_endpoint_override = "host.docker.internal:15432"
   rds_username_override = "postgres"
   rds_password_override = "password"
+  db_ssl_mode           = "disable"
 }

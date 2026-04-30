@@ -46,7 +46,7 @@ resource "vault_database_secret_backend_connection" "postgres" {
   allowed_roles = ["payments"]
 
   postgresql {
-    connection_url = "postgresql://{{username}}:{{password}}@${local.db_endpoint}/payments?sslmode=require"
+    connection_url = "postgresql://{{username}}:{{password}}@${local.db_endpoint}/payments?sslmode=${var.db_ssl_mode}"
     username       = local.db_username
     password       = local.db_password
   }

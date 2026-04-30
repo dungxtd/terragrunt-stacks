@@ -78,3 +78,15 @@ variable "node_desired_size" {
   type        = number
   default     = 2
 }
+
+variable "cluster_endpoint_public_access_cidrs" {
+  description = "CIDRs allowed to reach the EKS public API. Default 0.0.0.0/0 (open). Restrict in production."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "cluster_enabled_log_types" {
+  description = "EKS control plane log types to enable"
+  type        = list(string)
+  default     = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+}

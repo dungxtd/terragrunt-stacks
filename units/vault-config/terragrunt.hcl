@@ -46,5 +46,7 @@ inputs = {
   rds_username          = coalesce(local._env_cfg.locals.rds_username_override, dependency.rds.outputs.rds_username, "NOT_YET_DEPLOYED")
   rds_master_secret_arn = dependency.rds.outputs.rds_master_secret_arn
 
+  db_ssl_mode = local._env_cfg.locals.db_ssl_mode
+
   payments_processor_password = local._payments_processor_password
 }

@@ -33,6 +33,8 @@ inputs = {
   node_min_size                            = local.env_cfg.locals.eks_node_min_size
   node_max_size                            = local.env_cfg.locals.eks_node_max_size
   node_desired_size                        = local.env_cfg.locals.eks_node_desired_size
+  cluster_endpoint_public_access_cidrs     = local.env_cfg.locals.eks_endpoint_public_access_cidrs
+  cluster_enabled_log_types                = local.env_cfg.locals.eks_cluster_enabled_log_types
 }
 
 terraform {

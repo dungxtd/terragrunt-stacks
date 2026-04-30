@@ -20,6 +20,8 @@ locals {
   eks_node_min_size                        = 3
   eks_node_max_size                        = 5
   eks_node_desired_size                    = 3
+  eks_endpoint_public_access_cidrs         = ["0.0.0.0/0"]  # Open: free GitHub runners have dynamic IPs. Restrict after enabling github-runner unit (self-hosted in VPC).
+  eks_cluster_enabled_log_types            = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
   # VPC — single NAT to cut cost (~$32/mo vs ~$96/mo for 3 AZs)
   enable_nat_gateway = true
@@ -27,13 +29,13 @@ locals {
 
   # RDS
   rds_multi_az                = false
-  rds_deletion_protection     = false
-  rds_performance_insights    = false
+  rds_deletion_protection     = true
+  rds_performance_insights    = true
   rds_monitoring_interval     = 0
   rds_skip_final_snapshot     = false
   rds_create_monitoring_role  = false
   rds_instance_class          = "db.t3.micro"
-  rds_backup_retention_period = 0
+  rds_backup_retention_period = 7
   rds_allocated_storage       = 20
   rds_max_allocated_storage   = 20
 
@@ -59,4 +61,5 @@ locals {
   rds_endpoint_override = ""
   rds_username_override = ""
   rds_password_override = ""
+  db_ssl_mode           = "require"  # TODO: upgrade to "verify-full" after mounting RDS CA bundle in Vault pods
 }
