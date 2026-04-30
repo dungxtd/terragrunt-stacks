@@ -20,7 +20,7 @@ locals {
   eks_node_min_size                        = 3
   eks_node_max_size                        = 5
   eks_node_desired_size                    = 3
-  eks_endpoint_public_access_cidrs         = ["0.0.0.0/0"]  # Open: free GitHub runners have dynamic IPs. Restrict after enabling github-runner unit (self-hosted in VPC).
+  eks_endpoint_public_access_cidrs         = ["0.0.0.0/0"] # Open: free GitHub runners have dynamic IPs. Restrict after enabling github-runner unit (self-hosted in VPC).
   eks_cluster_enabled_log_types            = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
   # VPC — single NAT to cut cost (~$32/mo vs ~$96/mo for 3 AZs)
@@ -61,5 +61,5 @@ locals {
   rds_endpoint_override = ""
   rds_username_override = ""
   rds_password_override = ""
-  db_ssl_mode           = "require"  # TODO: upgrade to "verify-full" after mounting RDS CA bundle in Vault pods
+  db_ssl_mode           = "require" # TODO: upgrade to "verify-full" after mounting RDS CA bundle in Vault pods
 }
