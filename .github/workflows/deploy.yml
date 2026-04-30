@@ -110,6 +110,9 @@ jobs:
             -o /usr/local/bin/terragrunt
           chmod +x /usr/local/bin/terragrunt
 
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
       - name: IAM policy simulation
         run: |
           # assumed-role ARN → IAM role ARN
@@ -132,6 +135,16 @@ jobs:
             exit 1
           fi
           echo "IAM OK"
+
+      # Vault provider's before_hook port-forwards via kubectl using
+      # ~/.kube/config. EKS unit's after_hook only generates kubeconfig on
+      # apply, so plan stage on a fresh runner has no kubeconfig → port-forward
+      # fails → vault refresh errors with "connection refused". Generate it
+      # explicitly here. Tolerate first-deploy failure (cluster may not exist).
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name terragrunt-infra-eks --region ${{ env.AWS_REGION }} || \
+            echo "kubeconfig not generated (cluster may not exist yet — first deploy)"
 
       - name: Terragrunt plan
         id: plan
@@ -191,6 +204,14 @@ jobs:
           curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64" \
             -o /usr/local/bin/terragrunt
           chmod +x /usr/local/bin/terragrunt
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name terragrunt-infra-eks --region ${{ env.AWS_REGION }} || \
+            echo "kubeconfig not generated (cluster may not exist yet — first deploy)"
 
       - name: Terragrunt apply
         env:

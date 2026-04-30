@@ -21,8 +21,11 @@ module "rds" {
   username = "postgres"
   port     = 5432
 
-  manage_master_user_password = local.use_managed_password
-  password                    = local.use_managed_password ? null : var.master_password_override
+  # v7 module dropped the `password` arg — secrets are always managed via
+  # Secrets Manager. Override path (ministack) carries the password through
+  # aws_secretsmanager_secret.master_override (see secrets_ministack.tf), and
+  # vault-config reads from the override-mirror ARN instead of this module's.
+  manage_master_user_password = true
 
   multi_az               = var.multi_az
   db_subnet_group_name   = var.database_subnet_group_name
