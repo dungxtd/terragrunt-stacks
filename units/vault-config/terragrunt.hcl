@@ -24,15 +24,14 @@ dependency "rds" {
   mock_outputs = {
     rds_endpoint          = "mock:5432"
     rds_username          = "postgres"
-    rds_master_secret_arn = "arn:aws:secretsmanager:ap-southeast-1:000000000000:secret:mock"
+    rds_master_secret_arn = ""
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
   mock_outputs_merge_strategy_with_state  = "shallow"
 }
 
 locals {
-  _env_name                    = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
-  _env_cfg                     = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
+  _env_cfg                     = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   _payments_processor_password = get_env("PAYMENTS_PROCESSOR_PASSWORD", "")
 }
 

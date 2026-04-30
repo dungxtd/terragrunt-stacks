@@ -6,8 +6,7 @@
 #   aws       → config_path = ~/.kube/config                (run: make kubeconfig)
 
 locals {
-  _env_name        = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
-  _env_cfg         = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
+  _env_cfg         = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   _kubeconfig_path = local._env_cfg.locals.kubeconfig_path
 }
 

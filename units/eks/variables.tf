@@ -79,6 +79,12 @@ variable "node_desired_size" {
   default     = 2
 }
 
+variable "kubernetes_version" {
+  description = "Kubernetes version for the EKS cluster"
+  type        = string
+  default     = "1.35"
+}
+
 variable "cluster_endpoint_public_access_cidrs" {
   description = "CIDRs allowed to reach the EKS public API. Default 0.0.0.0/0 (open). Restrict in production."
   type        = list(string)

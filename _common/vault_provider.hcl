@@ -8,16 +8,15 @@
 #   local dev               → localhost via port-forward or NodePort
 
 locals {
-  _env_name   = read_terragrunt_config(find_in_parent_folders("env.hcl")).locals.name
-  _env_cfg    = read_terragrunt_config("${get_repo_root()}/envs/${local._env_name}.hcl")
+  _env_cfg    = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   _kubeconfig = local._env_cfg.locals.kubeconfig_path
   _vault_port = 18200
 
   # Both local dev and CI reach Vault via port-forward on localhost
   _vault_address = "http://localhost:${local._vault_port}"
 
-  # Fetch vault root token from SSM at parse time.
-  # The actual command is env-specific and lives in envs/<env>.hcl.
+  # Fetch vault root token from SSM at parse time. Command is env-specific
+  # and lives in stacks/<stack>/<env>/env.hcl.
   _vault_token = run_cmd("--terragrunt-quiet", "bash", "-c", local._env_cfg.locals.vault_token_cmd)
 }
 

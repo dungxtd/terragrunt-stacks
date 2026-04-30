@@ -106,5 +106,12 @@ resource "helm_release" "linkerd_viz" {
   create_namespace = true
   timeout          = 600
 
+  # Allow ALB DNS hostnames (default regex blocks anything not localhost).
+  values = [yamlencode({
+    dashboard = {
+      enforcedHostRegexp = ".+"
+    }
+  })]
+
   depends_on = [helm_release.linkerd_control_plane]
 }

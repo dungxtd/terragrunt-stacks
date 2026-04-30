@@ -12,22 +12,14 @@
 ## Deployment Flow
 
 ```text
-                           ┌─────────────────┐
-                           │  local.hcl       │
-                           │  active_env = ?  │
-                           └────────┬────────┘
-                        ┌───────────┴───────────┐
-                        ▼                       ▼
-                   "ministack"               "aws"
-                        │                       │
-                        ▼                       ▼
-               envs/ministack.hcl         envs/aws.hcl
-               use_ministack=true         use_ministack=false
-               enable_github_runner=false enable_github_runner=true
-                        │                       │
-                        ▼                       ▼
-               make ms-bootstrap         make stack-vault apply
-                                         make gitops-bootstrap
+               stacks/vault-consul/<env>/env.hcl
+               Each env.hcl is self-contained: provider, backend, feature flags.
+                        │
+                        ├─── ministack/env.hcl        production/env.hcl
+                        │                              │
+                        ▼                              ▼
+               make ms-bootstrap              make stack-vault-production apply
+               (auto → ministack dir)         + pipeline applies gitops & ingresses
 ```
 
 ### Terragrunt Stack Layers
@@ -43,7 +35,7 @@
                 │                │
   Layer 5 ─── certs      ─── vault-config ─────────── Vault PKI + Config
                 │
-  Layer 6 ─── linkerd     ─── argocd ─────────────── Platform + GitOps
+  Layer 6 ─── linkerd     ─── argocd ─── aws-alb ── Platform + GitOps
                 │
   Layer 7 ─── github-runner ───────────────────────── CI/CD (AWS only)
 ```
@@ -52,7 +44,7 @@
 
 ```text
   Wave 1 ─── consul ────────────────── Service mesh
-  Wave 2 ─── aws-alb + datadog ────── Infra controllers + monitoring
+  Wave 2 ─── datadog ────────────── Monitoring (aws-alb is Terraform-managed)
   Wave 3 ─── flagger ─────────────── Progressive delivery
   Wave 4 ─── payments-app ─────────── Application
 ```
@@ -65,9 +57,9 @@
 
 ```text
   Environment:    ministack
-  Config:         envs/ministack.hcl
+  Config:         stacks/vault-consul/ministack/env.hcl
   Bootstrap:      make ms-bootstrap  (single command, ~4 min)
-  Env vars:       source load_env.sh
+  Env vars:       source load_env.sh ministack
   Teardown:       make ms-teardown
 ```
 
@@ -186,11 +178,10 @@
 ### Overview
 
 ```text
-  Environment:    aws
-  Config:         envs/aws.hcl
-  Switch:         make ms-disable  (sets active_env="aws" in local.hcl)
-  Bootstrap:      make stack-vault apply && make gitops-bootstrap
-  Env vars:       source load_env.sh
+  Environment:    production
+  Config:         stacks/vault-consul/production/env.hcl
+  Bootstrap:      make stack-vault-production apply  (pipeline auto-applies gitops + ingresses)
+  Env vars:       source load_env.sh production
 ```
 
 ### What's Different from MiniStack

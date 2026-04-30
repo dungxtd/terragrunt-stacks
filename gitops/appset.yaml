@@ -16,13 +16,7 @@ spec:
             wave: "1"
 
           # ── Wave 2: Infrastructure controllers ───────────────
-          - app: aws-alb
-            repoURL: https://aws.github.io/eks-charts
-            chart: aws-load-balancer-controller
-            targetRevision: "*"
-            namespace: kube-system
-            wave: "2"
-
+          # aws-alb managed by Terraform (units/aws-alb) — needs IRSA
           - app: datadog
             repoURL: https://helm.datadoghq.com
             chart: datadog

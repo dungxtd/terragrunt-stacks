@@ -5,20 +5,17 @@ AWS infra for payments-app. Runs on MiniStack (local) or real AWS. Terragrunt or
 ## Repo Layout
 
 ```
-root.hcl              — root config: provider/backend generation, versions
+root.hcl              — root config: versions generate, delegates provider/backend to env.hcl
 common.hcl            — shared locals: project="terragrunt-infra", region="ap-southeast-1"
-envs/
-  production.hcl      — production feature flags (real AWS, all features on)
-  ministack.hcl       — ministack feature flags (use_ministack=true, nat disabled, github-runner disabled)
 _common/
   vault_provider.hcl  — shared Vault token fetch (SSM) + port-forward hook + vault/k8s providers
   k8s_providers.hcl   — shared EKS dependency + helm/kubernetes providers
 stacks/vault-consul/
   production/
-    env.hcl                — locals { name = "production" }
+    env.hcl                — full per-env config (provider, backend, feature flags, kubeconfig, vault, RDS overrides)
     terragrunt.stack.hcl   — stack definition (7 layers, all units)
   ministack/
-    env.hcl                — locals { name = "ministack" }
+    env.hcl                — full per-env config (provider, backend, NAT disabled, etc.)
     terragrunt.stack.hcl   — stack definition (6 layers, no github-runner)
 units/<name>/         — individual Terraform modules (main.tf, variables.tf, outputs.tf, terragrunt.hcl)
 gitops/
@@ -78,13 +75,13 @@ source load_env.sh ministack           # Same for local dev
 ## Environment Detection
 
 No toggle file. Env is determined by **which stack directory you run from**:
-- `stacks/vault-consul/production/` → reads `production/env.hcl` → loads `envs/production.hcl`
-- `stacks/vault-consul/ministack/`  → reads `ministack/env.hcl`  → loads `envs/ministack.hcl`
+- `stacks/vault-consul/production/env.hcl` carries the full production config
+- `stacks/vault-consul/ministack/env.hcl`  carries the full ministack config
 
-`root.hcl` uses `find_in_parent_folders("env.hcl")` to resolve the env automatically.
+`root.hcl` uses `find_in_parent_folders("env.hcl")` to resolve the env automatically. Each env.hcl is self-contained: it carries its own `provider_content` (AWS provider block) and `backend_config` (S3 backend map). root.hcl just passes them through — no flags, no ternaries.
 
 - **production**: real AWS credentials, all features on
-- **ministack**: endpoint=http://localhost:4566, creds=test/test, no NAT, no github-runner
+- **ministack**: LocalStack endpoint, test creds, no NAT, no github-runner
 
 ## _common Includes
 
@@ -103,5 +100,5 @@ Units include `_common/vault_provider.hcl` or `_common/k8s_providers.hcl` via `r
 
 ## Provider Versions
 
-- aws ~> 5.0, helm ~> 2.0, kubernetes ~> 2.0, vault ~> 4.0, tls ~> 4.0
-- terraform >= 1.7, terragrunt >= 1.0.2
+- aws ~> 6.42, helm ~> 3.1, kubernetes ~> 2.35, vault ~> 5.2, tls ~> 4.0
+- terraform >= 1.12, terragrunt >= 1.0.3

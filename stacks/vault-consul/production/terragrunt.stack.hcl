@@ -55,6 +55,11 @@ unit "argocd" {
   path   = "argocd"
 }
 
+unit "aws_alb" {
+  source = "../../../units/aws-alb"
+  path   = "aws-alb"
+}
+
 # ── Layer 7: CI/CD Runner ────────────────────────────────────────
 
 unit "github_runner" {

@@ -11,8 +11,15 @@ global:
 
 server:
   enabled: true
-  replicas: 3
-  storage: 10Gi
+  replicas: 1
+  storage: 1Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
 
 client:
   enabled: true
@@ -26,14 +33,10 @@ connectInject:
 apiGateway:
   enabled: true
   managedGatewayClass:
-    serviceType: LoadBalancer
+    serviceType: ClusterIP  # free tier: no extra LB (~$16/mo)
 
 terminatingGateways:
-  enabled: true
-  defaults:
-    replicas: 1
-  gateways:
-    - name: terminating-gateway
+  enabled: false
 
 meshGateway:
   enabled: false
@@ -41,4 +44,4 @@ meshGateway:
 ui:
   enabled: true
   service:
-    type: LoadBalancer
+    type: ClusterIP

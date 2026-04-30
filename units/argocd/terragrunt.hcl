@@ -8,6 +8,6 @@ include "k8s" {
 }
 
 inputs = {
-  enable_consul_project = try(values.enable_consul_project, false)
+  enable_consul_project = true
   service_type          = include.root.locals.env_cfg.locals.argocd_service_type
 }
