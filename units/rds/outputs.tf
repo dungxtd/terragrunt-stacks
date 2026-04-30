@@ -26,6 +26,7 @@ output "rds_username" {
 
 output "rds_master_secret_arn" {
   description = "ARN of the Secrets Manager secret holding {username,password} for the master user. Always populated — managed by RDS in prod, mirrored from override in ministack."
+  sensitive   = true
   value = (
     local.use_managed_password
     ? module.rds.db_instance_master_user_secret_arn
