@@ -11,7 +11,7 @@ spec:
           - app: consul
             repoURL: https://helm.releases.hashicorp.com
             chart: consul
-            targetRevision: "1.4.*"
+            targetRevision: "*"
             namespace: consul
             wave: "1"
 
