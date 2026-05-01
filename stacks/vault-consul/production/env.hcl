@@ -39,8 +39,8 @@ locals {
   update_launch_template_default_version   = true
   use_latest_ami_release_version           = true
   eks_kubernetes_version                   = "1.35"
-  eks_node_instance_types                  = ["t3.medium"]
-  eks_node_min_size                        = 4
+  eks_node_instance_types                  = ["t3.small"]
+  eks_node_min_size                        = 5
   eks_node_max_size                        = 6
   eks_node_desired_size                    = 5
   eks_endpoint_public_access_cidrs         = ["0.0.0.0/0"] # Open: free GitHub runners have dynamic IPs. Restrict after enabling github-runner unit (self-hosted in VPC).
