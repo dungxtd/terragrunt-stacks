@@ -60,18 +60,18 @@ spec:
             {{- end }}
           startupProbe:
             httpGet:
-              path: /health
+              path: /actuator/health
               port: 8080
             periodSeconds: 5
             failureThreshold: 36
           livenessProbe:
             httpGet:
-              path: /health
+              path: /actuator/health
               port: 8080
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /ready
+              path: /actuator/health
               port: 8080
             periodSeconds: 5
           resources:

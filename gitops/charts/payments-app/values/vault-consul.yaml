@@ -16,7 +16,7 @@ publicApi:
   replicas: 1
 
 frontend:
-  image: hashicorpdemoapp/frontend:v1.0.6
+  image: hashicorpdemoapp/frontend-nginx:v1.0.9
   replicas: 1
 
 ingress:

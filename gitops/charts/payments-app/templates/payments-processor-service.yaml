@@ -11,6 +11,6 @@ spec:
     app: payments-processor
   ports:
     - port: 9090
-      targetPort: 9090
+      targetPort: 8080
       name: http
   type: ClusterIP

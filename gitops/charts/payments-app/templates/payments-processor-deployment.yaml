@@ -28,7 +28,7 @@ spec:
         - name: payments-processor
           image: {{ .Values.paymentsProcessor.image }}
           ports:
-            - containerPort: 9090
+            - containerPort: 8080
               name: http
           env:
             - name: NAME
@@ -50,7 +50,7 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 128Mi
+              memory: 384Mi
             limits:
-              cpu: 250m
-              memory: 256Mi
+              cpu: 500m
+              memory: 768Mi

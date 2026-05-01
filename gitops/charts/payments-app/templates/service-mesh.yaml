@@ -52,7 +52,7 @@ spec:
       action: allow
 {{- end }}
 {{- if eq .Values.mesh "linkerd" }}
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   name: payments-app
@@ -62,7 +62,7 @@ spec:
     matchLabels:
       app: payments-app
   port: 8080
-  proxyProtocol: HTTP/2
+  proxyProtocol: HTTP/1
 ---
 apiVersion: policy.linkerd.io/v1alpha1
 kind: AuthorizationPolicy
