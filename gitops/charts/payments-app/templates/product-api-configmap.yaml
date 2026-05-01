@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-api-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "payments-app.labels" . | nindent 4 }}
+data:
+  conf.json: |
+    {
+      "db_connection": "host=product-db port=5432 user={{ .Values.productDb.username }} password={{ .Values.productDb.password }} dbname={{ .Values.productDb.database }} sslmode=disable",
+      "bind_address": ":9090",
+      "metrics_address": ":9103"
+    }

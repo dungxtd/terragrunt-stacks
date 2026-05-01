@@ -38,7 +38,7 @@ spec:
             - name: PAYMENT_API_URI
               value: "http://payments-app:8080"
             - name: PRODUCT_API_URI
-              value: "http://payments-app:8080"
+              value: "http://product-api:9090"
           resources:
             requests:
               cpu: 50m

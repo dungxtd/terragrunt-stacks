@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-api
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: product-api
+    {{- include "payments-app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.productApi.replicas }}
+  selector:
+    matchLabels:
+      app: product-api
+  template:
+    metadata:
+      labels:
+        app: product-api
+      annotations:
+        {{- if eq .Values.mesh "linkerd" }}
+        linkerd.io/inject: enabled
+        {{- end }}
+        {{- if eq .Values.mesh "consul" }}
+        consul.hashicorp.com/connect-inject: "true"
+        {{- end }}
+    spec:
+      containers:
+        - name: product-api
+          image: {{ .Values.productApi.image }}
+          ports:
+            - containerPort: 9090
+              name: http
+          volumeMounts:
+            - name: product-api-config
+              mountPath: /conf.json
+              subPath: conf.json
+          readinessProbe:
+            httpGet:
+              path: /health/readyz
+              port: 9090
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/livez
+              port: 9090
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: product-api-config
+          configMap:
+            name: product-api-config

@@ -15,6 +15,17 @@ publicApi:
   image: hashicorpdemoapp/public-api:v0.0.7
   replicas: 1
 
+productApi:
+  image: hashicorpdemoapp/product-api:v0.0.20
+  replicas: 1
+
+productDb:
+  image: hashicorpdemoapp/product-api-db:v0.0.20
+  replicas: 1
+  database: products
+  username: postgres
+  password: password
+
 frontend:
   image: hashicorpdemoapp/frontend-nginx:v1.0.9
   replicas: 1
