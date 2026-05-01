@@ -1,6 +1,6 @@
 namespace: payments-app
 
-mesh: consul
+mesh: linkerd
 secrets: vault
 
 paymentsApp:

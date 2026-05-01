@@ -49,7 +49,35 @@ module "eks" {
     eks-pod-identity-agent = { most_recent = true, before_compute = true }
     kube-proxy             = { most_recent = true }
     coredns                = { most_recent = true }
+    aws-ebs-csi-driver = {
+      most_recent              = true
+      service_account_role_arn = module.ebs_csi_irsa.iam_role_arn
+      # defaultStorageClass.enabled marks gp2 as default so PVCs without
+      # explicit storageClassName bind. Without this, consul-server PVC
+      # stays Pending on fresh cluster.
+      configuration_values = jsonencode({
+        defaultStorageClass = { enabled = true }
+      })
+    }
   } : {}
+
+  tags = var.tags
+}
+
+module "ebs_csi_irsa" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.58"
+
+  role_name = "${var.project}-ebs-csi"
+
+  attach_ebs_csi_policy = true
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:ebs-csi-controller-sa"]
+    }
+  }
 
   tags = var.tags
 }

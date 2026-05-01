@@ -25,6 +25,10 @@ resource "helm_release" "argocd" {
   namespace        = "argocd"
   create_namespace = true
 
+  timeout         = 900
+  wait_for_jobs   = true
+  cleanup_on_fail = true
+
   values = [yamlencode({
     server = {
       service = {

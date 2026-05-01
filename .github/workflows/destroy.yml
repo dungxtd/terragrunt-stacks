@@ -52,6 +52,17 @@ jobs:
             -o /usr/local/bin/terragrunt
           chmod +x /usr/local/bin/terragrunt
 
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v5
+
+      # vault provider's before_hook port-forwards Vault via kubectl. certs and
+      # vault-config destroy first (depend on Vault) — kubeconfig must exist
+      # before Terragrunt runs. Tolerate missing cluster (already destroyed).
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name terragrunt-infra-eks --region ${{ env.AWS_REGION }} || \
+            echo "kubeconfig not generated (cluster may already be destroyed)"
+
       - name: Force-unlock stale locks
         if: github.event.inputs.force_unlock == 'true'
         run: |
