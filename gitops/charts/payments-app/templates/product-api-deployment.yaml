@@ -21,6 +21,8 @@ spec:
         {{- end }}
         {{- if eq .Values.mesh "consul" }}
         consul.hashicorp.com/connect-inject: "true"
+        {{- else }}
+        consul.hashicorp.com/connect-inject: "false"
         {{- end }}
     spec:
       containers:

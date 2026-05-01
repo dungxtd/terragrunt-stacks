@@ -22,6 +22,8 @@ spec:
         {{- if eq .Values.mesh "consul" }}
         consul.hashicorp.com/connect-inject: "true"
         consul.hashicorp.com/connect-service-upstreams: "payments-processor:9090,payments-app-database:5432"
+        {{- else }}
+        consul.hashicorp.com/connect-inject: "false"
         {{- end }}
         {{- if eq .Values.secrets "vault" }}
         vault.hashicorp.com/agent-inject: "true"
@@ -76,8 +78,8 @@ spec:
             periodSeconds: 5
           resources:
             requests:
-              cpu: 200m
-              memory: 384Mi
+              cpu: 100m
+              memory: 256Mi
             limits:
               cpu: 500m
-              memory: 768Mi
+              memory: 640Mi

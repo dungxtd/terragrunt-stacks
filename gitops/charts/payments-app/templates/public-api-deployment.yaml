@@ -22,6 +22,8 @@ spec:
         {{- if eq .Values.mesh "consul" }}
         consul.hashicorp.com/connect-inject: "true"
         consul.hashicorp.com/connect-service-upstreams: "payments-app:8080"
+        {{- else }}
+        consul.hashicorp.com/connect-inject: "false"
         {{- end }}
     spec:
       containers:
