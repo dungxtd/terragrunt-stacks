@@ -25,12 +25,7 @@ client:
   enabled: true
 
 connectInject:
-  enabled: true
-  default: true
-  transparentProxy:
-    defaultEnabled: true
-  apiGateway:
-    manageExternalCRDs: false
+  enabled: false
 
 terminatingGateways:
   enabled: false

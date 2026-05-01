@@ -1,5 +1,9 @@
-meshProvider: consul
-metricsServer: http://prometheus-server.default:9090
+meshProvider: linkerd
+metricsServer: http://prometheus.linkerd-viz:9090
+
+podAnnotations:
+  consul.hashicorp.com/connect-inject: "false"
+  linkerd.io/inject: enabled
 
 podMonitor:
   enabled: false

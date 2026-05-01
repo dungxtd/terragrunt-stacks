@@ -14,3 +14,16 @@ clusterAgent:
   enabled: true
   metricsProvider:
     enabled: true
+  podAnnotations:
+    consul.hashicorp.com/connect-inject: "false"
+    linkerd.io/inject: disabled
+
+agents:
+  podAnnotations:
+    consul.hashicorp.com/connect-inject: "false"
+    linkerd.io/inject: disabled
+
+clusterChecksRunner:
+  podAnnotations:
+    consul.hashicorp.com/connect-inject: "false"
+    linkerd.io/inject: disabled

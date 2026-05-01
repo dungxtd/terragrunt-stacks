@@ -80,6 +80,12 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: payments-app
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: payments-app
+      jsonPointers:
+        - /spec/replicas
   syncPolicy:
     automated:
       prune: true

@@ -23,7 +23,7 @@ gitops/
   values/             — Helm values per app
 ```
 
-## Units
+## Units (Terraform)
 
 | Unit | Layer | Purpose |
 |------|-------|---------|
@@ -36,11 +36,12 @@ gitops/
 | vault-config | 5 | Vault secrets engines, PKI, DB dynamic creds |
 | linkerd | 6 | Service mesh |
 | argocd | 6 | GitOps controller |
+| aws-alb | 6 | AWS ALB Ingress controller (IRSA) |
 | github-runner | 7 | ARC self-hosted runner (AWS only) |
 
-## GitOps Waves (ArgoCD)
+## GitOps Waves (ArgoCD — managed via gitops/appset.yaml, NOT Terraform)
 
-Wave 1: consul → Wave 2: aws-alb + datadog → Wave 3: flagger → Wave 4: payments-app
+Wave 1: consul → Wave 2: datadog → Wave 3: flagger → Wave 4: payments-app
 
 ## Key Commands
 
