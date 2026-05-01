@@ -20,6 +20,20 @@ module "eks" {
   create_security_group      = var.create_cluster_security_group
   create_node_security_group = var.create_node_security_group
 
+  # Range covers Vault/Consul injectors (8080), Linkerd (8443), AWS LBC/ArgoCD (9443).
+  # apiserver→pod webhook calls otherwise time out → failurePolicy=Ignore silently
+  # skips injection (vault-agent + Consul envoy sidecars never added).
+  node_security_group_additional_rules = {
+    ingress_cluster_webhooks = {
+      description                   = "Allow EKS control plane to reach admission webhooks on nodes"
+      protocol                      = "tcp"
+      from_port                     = 8080
+      to_port                       = 9443
+      type                          = "ingress"
+      source_cluster_security_group = true
+    }
+  }
+
   eks_managed_node_groups = {
     default = {
       instance_types = var.node_instance_types
