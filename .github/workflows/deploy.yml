@@ -89,7 +89,6 @@ jobs:
           output_format: cli
           soft_fail: false
           skip_check: CKV_AWS_144,CKV_AWS_18,CKV_TF_1,CKV2_AWS_5
-          download_external_modules: true
 
   plan:
     name: Plan
