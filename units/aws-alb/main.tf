@@ -1,6 +1,6 @@
 module "alb_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.48"
+  version = "~> 5.58"
 
   role_name = "${var.project}-alb-controller"
 
