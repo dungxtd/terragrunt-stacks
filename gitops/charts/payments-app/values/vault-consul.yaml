@@ -12,11 +12,11 @@ paymentsProcessor:
   replicas: 1
 
 publicApi:
-  image: hashicorpdemoapp/public-api:latest
+  image: hashicorpdemoapp/public-api:v0.0.7
   replicas: 1
 
 frontend:
-  image: hashicorpdemoapp/frontend-nginx:latest
+  image: hashicorpdemoapp/frontend-nginx:v1.0.9
   replicas: 1
 
 ingress:
