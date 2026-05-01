@@ -53,6 +53,35 @@ spec:
       destination:
         server: https://kubernetes.default.svc
         namespace: "{{namespace}}"
+      ignoreDifferences:
+        - group: batch
+          kind: Job
+          jsonPointers:
+            - /spec/template/metadata/annotations
+            - /spec/template/spec
+        - group: ""
+          kind: Secret
+          name: datadog-cluster-agent
+          jsonPointers:
+            - /data
+        - group: ""
+          kind: ConfigMap
+          name: datadog-kpi-telemetry-configmap
+          jsonPointers:
+            - /data
+        - group: apps
+          kind: Deployment
+          name: datadog-cluster-agent
+          jsonPointers:
+            - /spec/template/metadata/annotations
+            - /spec/template/spec/containers
+        - group: apps
+          kind: StatefulSet
+          name: consul-server
+          jsonPointers:
+            - /spec/template/metadata/annotations
+            - /spec/template/spec/containers
+            - /spec/volumeClaimTemplates
       syncPolicy:
         automated:
           prune: true
@@ -86,6 +115,11 @@ spec:
       name: payments-app
       jsonPointers:
         - /spec/replicas
+    - group: ""
+      kind: Service
+      name: payments-app
+      jsonPointers:
+        - /spec/selector
   syncPolicy:
     automated:
       prune: true
