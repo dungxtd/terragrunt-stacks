@@ -29,9 +29,8 @@ connectInject:
   default: true
   transparentProxy:
     defaultEnabled: true
-
-apiGateway:
-  enabled: false  # using AWS ALB (gitops/platform-ui) — no need for Consul API gateway
+  apiGateway:
+    manageExternalCRDs: false
 
 terminatingGateways:
   enabled: false
