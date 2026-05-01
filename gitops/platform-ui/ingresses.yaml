@@ -1,18 +1,14 @@
-# Single shared ALB via alb.ingress.kubernetes.io/group.name=platform.
-# All 5 ingresses across namespaces collapse onto ONE ALB; routing by path prefix.
-#
-# Layout (single ALB DNS, multiple paths):
+# Shared ALB (group.name=platform):
 #   /argocd/*    → argocd-server   (subpath via configs.params)
-#   /consul/*    → consul-ui       (subpath via ui.contentPath)
-#   /payments/*  → payments-app    (subpath via Spring server.servlet.context-path)
-#   /vault/*     → vault           (UI assets may 404 — Vault has no subpath support)
-#   /linkerd/*   → linkerd-viz/web (UI assets may 404 — viz has no subpath support)
+#   /*           → frontend        (catch-all, group.order=99)
 #
-# Vault + linkerd-viz: route forwards but UI assets break (no native subpath).
-# Workaround: kubectl port-forward when full UI needed.
+# Dedicated ALBs (no group, path=/, ~$16/mo each — UI subpath broken):
+#   consul-ui    → consul-ui       (UI hardcodes API at /v1/)
+#   vault-ui     → vault           (Vault has no subpath support)
+#   linkerd-viz  → web             (viz hardcodes asset paths)
 #
-# Get shared ALB hostname:
-#   kubectl get ingress -A -l alb.group=platform -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}'
+# Get ALB hostnames:
+#   kubectl get ingress -A -o wide
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -41,19 +37,17 @@ spec:
                 port:
                   number: 80
 ---
+# Dedicated ALB for Consul. Subpath broken (UI hardcodes API at /v1/, content_path
+# only fixes assets) — separate ALB at root path is the only way to expose UI.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: consul-ui
   namespace: consul
-  labels:
-    alb.group: platform
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/group.name: platform
-    alb.ingress.kubernetes.io/group.order: "20"
     alb.ingress.kubernetes.io/backend-protocol: HTTPS
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
     alb.ingress.kubernetes.io/healthcheck-path: /v1/status/leader
@@ -62,13 +56,60 @@ spec:
   rules:
     - http:
         paths:
-          - path: /consul
+          - path: /
             pathType: Prefix
             backend:
               service:
                 name: consul-ui
                 port:
                   number: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vault-ui
+  namespace: vault
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /v1/sys/health
+    alb.ingress.kubernetes.io/success-codes: 200,429,472,473
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vault
+                port:
+                  number: 8200
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: linkerd-viz
+  namespace: linkerd-viz
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8084
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -96,58 +137,3 @@ spec:
                 name: frontend
                 port:
                   number: 80
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: vault-ui
-  namespace: vault
-  labels:
-    alb.group: platform
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/group.name: platform
-    alb.ingress.kubernetes.io/group.order: "40"
-    alb.ingress.kubernetes.io/healthcheck-path: /v1/sys/health
-    alb.ingress.kubernetes.io/success-codes: 200,429,472,473
-spec:
-  ingressClassName: alb
-  rules:
-    - http:
-        paths:
-          - path: /vault
-            pathType: Prefix
-            backend:
-              service:
-                name: vault
-                port:
-                  number: 8200
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: linkerd-viz
-  namespace: linkerd-viz
-  labels:
-    alb.group: platform
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/group.name: platform
-    alb.ingress.kubernetes.io/group.order: "50"
-    alb.ingress.kubernetes.io/healthcheck-path: /
-spec:
-  ingressClassName: alb
-  rules:
-    - http:
-        paths:
-          - path: /linkerd
-            pathType: Prefix
-            backend:
-              service:
-                name: web
-                port:
-                  number: 8084

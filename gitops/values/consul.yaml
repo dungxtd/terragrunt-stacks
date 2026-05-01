@@ -20,13 +20,6 @@ server:
     limits:
       cpu: 250m
       memory: 256Mi
-  # ui.contentPath shorthand broken in chart 1.9.x — set via raw agent config
-  extraConfig: |
-    {
-      "ui_config": {
-        "content_path": "/consul"
-      }
-    }
 
 client:
   enabled: true
