@@ -45,3 +45,5 @@ ui:
   enabled: true
   service:
     type: ClusterIP
+  # Subpath for shared ALB at /consul
+  contentPath: /consul

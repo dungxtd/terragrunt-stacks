@@ -81,7 +81,6 @@ jobs:
           output_format: cli
           soft_fail: false
           skip_check: CKV_AWS_144,CKV_AWS_18,CKV_TF_1,CKV2_AWS_5
-          download_external_modules: true
 
   plan:
     name: Plan
@@ -244,17 +243,23 @@ jobs:
           kubectl apply -f gitops/platform-ui/
           echo "✓ Platform UI ingresses applied"
 
-      - name: Print platform URLs
+      - name: Print platform URL
         run: |
-          echo "Waiting up to 5m for ALBs to provision..."
-          for ing in argocd/argocd-ui vault/vault-ui consul/consul-ui linkerd-viz/linkerd-viz payments-app/payments-app; do
-            ns="${ing%/*}"
-            name="${ing#*/}"
-            for i in {1..30}; do
-              host=$(kubectl -n "$ns" get ingress "$name" \
-                -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-              [ -n "$host" ] && break
-              sleep 10
-            done
-            echo "$name → ${host:-<pending>}"
+          echo "Waiting up to 5m for shared ALB (group=platform)..."
+          for i in {1..30}; do
+            host=$(kubectl -n argocd get ingress argocd-ui \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+            [ -n "$host" ] && break
+            sleep 10
           done
+          if [ -z "$host" ]; then
+            echo "ALB not yet provisioned — check 'kubectl get ingress -A -l alb.group=platform'"
+            exit 0
+          fi
+          echo ""
+          echo "═══ Shared ALB: $host ═══"
+          echo "  ArgoCD     → http://$host/argocd"
+          echo "  Consul     → http://$host/consul"
+          echo "  Payments   → http://$host/payments"
+          echo "  Vault*     → http://$host/vault     (UI assets may break — no native subpath)"
+          echo "  Linkerd*   → http://$host/linkerd   (UI assets may break — no native subpath)"
