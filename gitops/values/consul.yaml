@@ -31,9 +31,7 @@ connectInject:
     defaultEnabled: true
 
 apiGateway:
-  enabled: true
-  managedGatewayClass:
-    serviceType: ClusterIP  # free tier: no extra LB (~$16/mo)
+  enabled: false  # using AWS ALB (gitops/platform-ui) — no need for Consul API gateway
 
 terminatingGateways:
   enabled: false
