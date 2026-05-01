@@ -1,0 +1,18 @@
+{{- if .Values.db.host }}
+# ExternalName so chart-internal hostname `payments-app-database` resolves to RDS.
+# Vault DB engine returns dynamic creds; app builds connection URL with this hostname.
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-app-database
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "payments-app.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.db.host }}
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+{{- end }}

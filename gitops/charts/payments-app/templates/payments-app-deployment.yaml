@@ -18,6 +18,9 @@ spec:
       annotations:
         {{- if eq .Values.mesh "linkerd" }}
         linkerd.io/inject: enabled
+        # vault-agent-init runs while linkerd-proxy not ready; skip mesh on vault
+        # ports so init auth bypass linkerd-proxy redirect (else conn refused).
+        config.linkerd.io/skip-outbound-ports: "8200,8201"
         {{- end }}
         {{- if eq .Values.mesh "consul" }}
         consul.hashicorp.com/connect-inject: "true"
@@ -31,7 +34,7 @@ spec:
         vault.hashicorp.com/agent-inject-secret-db-creds: "payments-app/database/creds/payments"
         vault.hashicorp.com/agent-inject-template-db-creds: |
           {{`{{- with secret "payments-app/database/creds/payments" -}}
-          postgresql://{{ .Data.username }}:{{ .Data.password }}@payments-app-database:5432/payments?sslmode=disable
+          postgresql://{{ .Data.username }}:{{ .Data.password }}@payments-app-database:5432/payments?sslmode=require
           {{- end }}`}}
         {{- end }}
     spec:

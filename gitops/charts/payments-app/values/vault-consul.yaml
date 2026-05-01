@@ -5,7 +5,7 @@ secrets: vault
 
 paymentsApp:
   image: hashicorpdemoapp/payments:v0.0.16
-  replicas: 2
+  replicas: 1
 
 paymentsProcessor:
   image: hashicorpdemoapp/payments:v0.0.16
@@ -37,5 +37,8 @@ ingress:
 
 vault:
   address: "http://vault.vault.svc.cluster.local:8200"
+
+db:
+  host: "terragrunt-infra-payments.cngggs0q8d4s.ap-southeast-1.rds.amazonaws.com"
 
 sops: {}
