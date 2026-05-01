@@ -82,20 +82,20 @@ metadata:
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/group.name: platform
-    alb.ingress.kubernetes.io/group.order: "30"
-    alb.ingress.kubernetes.io/healthcheck-path: /payments/health
+    alb.ingress.kubernetes.io/group.order: "99"
+    alb.ingress.kubernetes.io/healthcheck-path: /
 spec:
   ingressClassName: alb
   rules:
     - http:
         paths:
-          - path: /payments
+          - path: /
             pathType: Prefix
             backend:
               service:
-                name: payments-app
+                name: frontend
                 port:
-                  number: 8080
+                  number: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -111,7 +111,7 @@ metadata:
     alb.ingress.kubernetes.io/group.name: platform
     alb.ingress.kubernetes.io/group.order: "40"
     alb.ingress.kubernetes.io/healthcheck-path: /v1/sys/health
-    alb.ingress.kubernetes.io/success-codes: 200,429,472,473,501,503
+    alb.ingress.kubernetes.io/success-codes: 200,429,472,473
 spec:
   ingressClassName: alb
   rules:

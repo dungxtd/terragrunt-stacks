@@ -1,4 +1,4 @@
-{{- if eq .Values.mesh "linkerd" }}
+{{- if and (eq .Values.mesh "linkerd") .Values.ingress.certificateArn }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

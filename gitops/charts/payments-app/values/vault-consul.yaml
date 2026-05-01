@@ -4,11 +4,19 @@ mesh: linkerd
 secrets: vault
 
 paymentsApp:
-  image: hashicorpdemoapp/payments:v0.0.16
+  image: hashicorpdemoapp/payments:latest
   replicas: 2
 
 paymentsProcessor:
-  image: hashicorpdemoapp/payments:v0.0.16
+  image: hashicorpdemoapp/payments:latest
+  replicas: 1
+
+publicApi:
+  image: hashicorpdemoapp/public-api:latest
+  replicas: 1
+
+frontend:
+  image: hashicorpdemoapp/frontend-nginx:latest
   replicas: 1
 
 ingress:
