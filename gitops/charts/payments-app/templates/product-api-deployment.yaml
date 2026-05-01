@@ -35,12 +35,12 @@ spec:
               subPath: conf.json
           readinessProbe:
             httpGet:
-              path: /health/readyz
+              path: /health
               port: 9090
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /health/livez
+              path: /health
               port: 9090
             periodSeconds: 10
           resources:
