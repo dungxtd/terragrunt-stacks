@@ -63,6 +63,28 @@ jobs:
           aws eks update-kubeconfig --name terragrunt-infra-eks --region ${{ env.AWS_REGION }} || \
             echo "kubeconfig not generated (cluster may already be destroyed)"
 
+      # Drain k8s app-layer resources so AWS controllers clean up ALBs/PVCs
+      # before TF destroys VPC. Skip if cluster gone.
+      - name: Drain k8s resources
+        run: |
+          if ! kubectl get ns >/dev/null 2>&1; then
+            echo "cluster unreachable, skip drain"
+            exit 0
+          fi
+          kubectl delete ingress --all -A --timeout=60s || true
+          kubectl get svc -A -o json \
+            | jq -r '.items[] | select(.spec.type=="LoadBalancer") | "\(.metadata.namespace) \(.metadata.name)"' \
+            | while read ns name; do kubectl -n "$ns" delete svc "$name" --timeout=60s || true; done
+          kubectl delete pvc --all -A --timeout=60s || true
+          # wait for ALB controller to actually delete ELBs
+          for i in $(seq 1 30); do
+            LBS=$(aws elbv2 describe-load-balancers --region ${{ env.AWS_REGION }} \
+              --query "LoadBalancers[?starts_with(LoadBalancerName,'k8s-')].LoadBalancerArn" --output text)
+            [ -z "$LBS" ] && break
+            echo "waiting for ELB cleanup..."
+            sleep 10
+          done
+
       - name: Force-unlock stale locks
         if: github.event.inputs.force_unlock == 'true'
         run: |
