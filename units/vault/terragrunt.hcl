@@ -41,7 +41,7 @@ inputs = {
           devRootToken = "root"
         }
       }
-      injector = { enabled = false }
+      injector = { enabled = true }
       csi      = { enabled = false }
       ui       = { enabled = true }
     })
