@@ -18,6 +18,8 @@ publicApi:
 frontend:
   image: hashicorpdemoapp/frontend-nginx:v1.0.9
   replicas: 1
+  publicApiUrl: "/"
+  footerFlag: "HashiCups"
 
 ingress:
   host: gateway.hashiconf.example.com
