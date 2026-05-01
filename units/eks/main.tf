@@ -12,7 +12,8 @@ module "eks" {
   endpoint_private_access      = true
   endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
 
-  enabled_log_types = var.cluster_enabled_log_types
+  enabled_log_types                      = var.cluster_enabled_log_types
+  cloudwatch_log_group_retention_in_days = 365
 
   enable_cluster_creator_admin_permissions = var.enable_cluster_creator_admin_permissions
 
@@ -28,6 +29,12 @@ module "eks" {
 
       update_launch_template_default_version = var.update_launch_template_default_version
       use_latest_ami_release_version         = var.use_latest_ami_release_version
+
+      metadata_options = {
+        http_endpoint               = "enabled"
+        http_tokens                 = "required" # IMDSv2 only (CKV_AWS_79)
+        http_put_response_hop_limit = 1          # block container IMDS hop (CKV_AWS_341)
+      }
 
       labels = {
         role = "general"

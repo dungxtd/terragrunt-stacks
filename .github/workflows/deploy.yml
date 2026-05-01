@@ -4,11 +4,19 @@ on:
   push:
     branches: [main]
     paths-ignore:
+      - "gitops/**"
+      - ".github/workflows/gitops.yml"
       - ".github/workflows/destroy.yml"
+      - "docs/**"
+      - "*.md"
   pull_request:
     branches: [main]
     paths-ignore:
+      - "gitops/**"
+      - ".github/workflows/gitops.yml"
       - ".github/workflows/destroy.yml"
+      - "docs/**"
+      - "*.md"
   workflow_dispatch:
     inputs:
       apply:
@@ -221,46 +229,3 @@ jobs:
           GITHUB_APP_INSTALLATION_ID: ${{ secrets.ARC_APP_INSTALLATION_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.ARC_APP_PRIVATE_KEY }}
         run: make stack-vault-production apply
-
-      # Refresh kubeconfig — apply just (re)created the EKS cluster on a first
-      # deploy; the earlier kubeconfig step may have been a no-op.
-      - name: Refresh kubeconfig
-        run: aws eks update-kubeconfig --name terragrunt-infra-eks --region ${{ env.AWS_REGION }}
-
-      - name: Bootstrap GitOps
-        run: |
-          kubectl apply -f gitops/appset.yaml
-          echo "✓ ArgoCD ApplicationSet applied"
-
-      - name: Ensure ingress namespaces
-        run: |
-          for ns in consul payments-app; do
-            kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
-          done
-          echo "✓ Ingress namespaces ready"
-
-      - name: Apply platform UI ingresses
-        run: |
-          kubectl apply -f gitops/platform-ui/
-          echo "✓ Platform UI ingresses applied"
-
-      - name: Print platform URL
-        run: |
-          echo "Waiting up to 5m for shared ALB (group=platform)..."
-          for i in {1..30}; do
-            host=$(kubectl -n argocd get ingress argocd-ui \
-              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-            [ -n "$host" ] && break
-            sleep 10
-          done
-          if [ -z "$host" ]; then
-            echo "ALB not yet provisioned — check 'kubectl get ingress -A -l alb.group=platform'"
-            exit 0
-          fi
-          echo ""
-          echo "═══ Shared ALB: $host ═══"
-          echo "  ArgoCD     → http://$host/argocd"
-          echo "  Consul     → http://$host/consul"
-          echo "  Payments   → http://$host/payments"
-          echo "  Vault*     → http://$host/vault     (UI assets may break — no native subpath)"
-          echo "  Linkerd*   → http://$host/linkerd   (UI assets may break — no native subpath)"
