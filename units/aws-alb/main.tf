@@ -1,6 +1,6 @@
 module "alb_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.58"
+  version = "~> 6.6"
 
   role_name = "${var.project}-alb-controller"
 
@@ -16,11 +16,13 @@ module "alb_irsa" {
   tags = var.tags
 }
 
+# CRDs must be applied separately — Helm chart does not upgrade CRDs.
+# kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
 resource "helm_release" "alb_controller" {
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
-  version    = "1.12.0"
+  version    = "3.2.2"
   namespace  = "kube-system"
 
   values = [yamlencode({

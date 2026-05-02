@@ -3,7 +3,7 @@ services:
     image: ministackorg/ministack:latest
     container_name: ministack
     privileged: true
-    entrypoint: /patches/entrypoint.sh
+    entrypoint: /entrypoint.sh
     ports:
       - "4566:4566"
     environment:
@@ -13,7 +13,7 @@ services:
       # - EKS_K3S_VERSION=v1.31.4-k3s1  # uncomment to pin k3s version
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./patches/entrypoint.sh:/patches/entrypoint.sh:ro
+      - ./entrypoint.sh:/entrypoint.sh:ro
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')"]
       interval: 5s

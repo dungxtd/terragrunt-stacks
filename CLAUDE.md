@@ -19,8 +19,14 @@ stacks/vault-consul/
     terragrunt.stack.hcl   — stack definition (6 layers, no github-runner)
 units/<name>/         — individual Terraform modules (main.tf, variables.tf, outputs.tf, terragrunt.hcl)
 gitops/
-  appset.yaml         — ArgoCD ApplicationSet (4 waves)
-  values/             — Helm values per app
+  apps/               — ArgoCD App-of-Apps: root.yaml, appset-platform.yaml, payments-app.yaml, platform-ui.yaml
+  charts/             — in-house Helm charts (_lib library + payments-app)
+  values/<app>/<env>.yaml — per-app per-env Helm values
+  platform-ui/        — raw ALB Ingress manifests
+ministack/            — local dev: docker-compose.yml + entrypoint.sh
+scripts/              — load_env.sh
+makefiles/            — modular Makefile parts (stacks, units, helm, k8s, vault, ministack, util)
+docs/                 — architecture.md, adr/, runbooks/, archive/
 ```
 
 ## Units (Terraform)
@@ -39,9 +45,12 @@ gitops/
 | aws-alb | 6 | AWS ALB Ingress controller (IRSA) |
 | github-runner | 7 | ARC self-hosted runner (AWS only) |
 
-## GitOps Waves (ArgoCD — managed via gitops/appset.yaml, NOT Terraform)
+## GitOps Waves (ArgoCD — App-of-Apps in gitops/apps/, NOT Terraform)
 
-Wave 1: consul → Wave 2: datadog → Wave 3: flagger → Wave 4: payments-app
+Wave 1: consul → Wave 2: datadog → Wave 3: flagger → Wave 4: payments-app → Wave 5: platform-ui
+
+Pinned chart versions live in `gitops/apps/appset-platform.yaml`:
+consul=1.9.7, datadog=3.205.0, flagger=1.43.0
 
 ## Key Commands
 
@@ -64,13 +73,15 @@ make apply-<unit> / plan-<unit> / destroy-<unit>
 make vault-status / vault-db-creds / vault-pki-roots / vault-rotate-db
 
 # GitOps
-make gitops-bootstrap                  # kubectl apply gitops/appset.yaml
+make gitops-bootstrap                  # kubectl apply gitops/apps/root.yaml (App-of-Apps)
+make alb-crds                          # apply aws-load-balancer-controller CRDs (after v3.x bump)
 
 # Utility
+make help                              # list all targets (auto-generated from ## comments)
 make tg-clean                          # rm .terragrunt-cache / .terraform dirs
 make fmt                               # terraform fmt -recursive units/
-source load_env.sh production          # Export KUBECONFIG, VAULT_ADDR, etc.
-source load_env.sh ministack           # Same for local dev
+source scripts/load_env.sh production  # Export KUBECONFIG, VAULT_ADDR, etc.
+source scripts/load_env.sh ministack   # Same for local dev
 ```
 
 ## Environment Detection

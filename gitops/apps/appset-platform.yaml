@@ -10,21 +10,21 @@ spec:
           - app: consul
             repoURL: https://helm.releases.hashicorp.com
             chart: consul
-            targetRevision: "*"
+            targetRevision: "1.9.7"   # appVersion 1.22.7 — pin; bump via Renovate
             namespace: consul
             wave: "1"
 
           - app: datadog
             repoURL: https://helm.datadoghq.com
             chart: datadog
-            targetRevision: "*"
+            targetRevision: "3.205.0" # appVersion 7.x
             namespace: datadog
             wave: "2"
 
           - app: flagger
             repoURL: https://flagger.app
             chart: flagger
-            targetRevision: "*"
+            targetRevision: "1.43.0"
             namespace: flagger-system
             wave: "3"
 

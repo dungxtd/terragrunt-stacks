@@ -59,7 +59,7 @@
   Environment:    ministack
   Config:         stacks/vault-consul/ministack/env.hcl
   Bootstrap:      make ms-bootstrap  (single command, ~4 min)
-  Env vars:       source load_env.sh ministack
+  Env vars:       source scripts/load_env.sh ministack
   Teardown:       make ms-teardown
 ```
 
@@ -147,7 +147,7 @@
     │     ├─ argocd           Helm: ArgoCD (NodePort)
     │     └─ github-runner    SKIPPED (count=0)
     │
-    ├─ 5. gitops-bootstrap ── kubectl apply appset.yaml
+    ├─ 5. gitops-bootstrap ── kubectl apply gitops/apps/root.yaml
     │     └─ Creates: consul, aws-alb, datadog, flagger, payments-app
     │
     └─ 6. cleanup ─────────── Kill stale port-forwards
@@ -168,7 +168,7 @@
   make vault-db-creds      Generate dynamic DB credentials
   make vault-rotate-db     Rotate DB root password
 
-  source load_env.sh       Export KUBECONFIG, VAULT_ADDR, ARGOCD_ADMIN_PASS, etc.
+  source scripts/load_env.sh       Export KUBECONFIG, VAULT_ADDR, ARGOCD_ADMIN_PASS, etc.
 ```
 
 ---
@@ -181,7 +181,7 @@
   Environment:    production
   Config:         stacks/vault-consul/production/env.hcl
   Bootstrap:      make stack-vault-production apply  (pipeline auto-applies gitops + ingresses)
-  Env vars:       source load_env.sh production
+  Env vars:       source scripts/load_env.sh production
 ```
 
 ### What's Different from MiniStack

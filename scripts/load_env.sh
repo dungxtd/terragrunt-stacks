@@ -4,14 +4,15 @@
 #        Defaults to production if no argument given.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV="${1:-production}"
 
 if [[ "$ENV" != "production" && "$ENV" != "ministack" ]]; then
-  echo "Usage: source load_env.sh [production|ministack]" >&2
+  echo "Usage: source scripts/load_env.sh [production|ministack]" >&2
   return 1
 fi
 
-STACK_DIR="$SCRIPT_DIR/stacks/vault-consul/$ENV/.terragrunt-stack"
+STACK_DIR="$REPO_ROOT/stacks/vault-consul/$ENV/.terragrunt-stack"
 
 tg_output() {
   local unit="$1" key="$2"
@@ -19,7 +20,7 @@ tg_output() {
 }
 
 if [ "$ENV" = "ministack" ]; then
-  export KUBECONFIG="$SCRIPT_DIR/.kubeconfig-ministack"
+  export KUBECONFIG="$REPO_ROOT/.kubeconfig-ministack"
   export VAULT_ADDR="http://localhost:18200"
   export VAULT_TOKEN="root"
   export AWS_REGION="ap-southeast-1"

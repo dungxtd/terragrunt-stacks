@@ -8,13 +8,13 @@ Runs on [MiniStack](https://github.com/ministackorg/ministack) (local) or real A
 ```bash
 # Local
 make ms-bootstrap          # Deploy everything from scratch (~4 min)
-source load_env.sh         # Export KUBECONFIG, VAULT_ADDR, etc.
+source scripts/load_env.sh         # Export KUBECONFIG, VAULT_ADDR, etc.
 
 # AWS
 make ms-disable            # Switch to AWS
 make stack-vault apply     # Deploy infrastructure
 make gitops-bootstrap      # Bootstrap ArgoCD (once)
-source load_env.sh
+source scripts/load_env.sh
 ```
 
 ## Stack Layers
@@ -47,14 +47,29 @@ make tg-clean              # Clear cache
 
 | Context | Method | Details |
 |---|---|---|
-| **Local dev** | `AWS_PROFILE` / `aws configure` | Set via `source load_env.sh` or `export AWS_PROFILE=...` |
+| **Local dev** | `AWS_PROFILE` / `aws configure` | Set via `source scripts/load_env.sh` or `export AWS_PROFILE=...` |
 | **CI/CD** | OIDC federation | GitHub Actions assumes `AWS_ROLE_ARN` via `aws-actions/configure-aws-credentials` |
 
 > **Do not** add `--profile` flags to the Makefile — it breaks CI where OIDC env vars are injected automatically.
 
+## Repo Layout
+
+```
+terraform/         (units/<name>)        — TF modules, one per resource group
+stacks/            vault-consul/{prod,ms}/ — terragrunt stack definitions per env
+gitops/            apps/, charts/, values/, platform-ui/  — ArgoCD-managed runtime
+ministack/         docker-compose.yml + entrypoint.sh     — local dev stack
+scripts/           load_env.sh                              — shell helpers
+makefiles/         stacks.mk units.mk helm.mk vault.mk ... — modular Makefile parts
+docs/              architecture.md, adr/, runbooks/, archive/
+```
+
 ## Docs
 
-- [Architecture diagrams](docs/architecture.md) — network topology, vault flow, env comparison
+- [Architecture](docs/architecture.md) — network topology, vault flow, env comparison
+- [ADRs](docs/adr/) — decisions: mesh choice, vault dev mode, ALB grouping
+- [Runbooks](docs/runbooks/) — fix recipes: canary stuck, consul stale services
+- [GitOps](gitops/README.md) — App-of-Apps layout, sync waves, payments-app chart
 
 ## Prerequisites
 
