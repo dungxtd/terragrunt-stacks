@@ -38,75 +38,7 @@ inputs = {
   vault_mode          = local.env_cfg.locals.vault_mode
   dev_root_token      = local.env_cfg.locals.dev_root_token
   vault_irsa_role_arn = local.env_cfg.locals.vault_mode == "ha" ? dependency.vault_irsa.outputs.vault_irsa_role_arn : ""
+  kms_key_id          = dependency.kms.outputs.vault_unseal_key_id
   ssm_endpoint        = local.env_cfg.locals.ssm_endpoint
   kubeconfig_path     = local.env_cfg.locals.kubeconfig_path
-
-  # Build Helm values at Terragrunt layer — module receives only the final YAML.
-  # Keyed by vault_mode ("dev" / "ha") from the env config.
-  helm_values = {
-    dev = yamlencode({
-      server = {
-        enabled = true
-        dev = {
-          enabled      = true
-          devRootToken = "root"
-        }
-      }
-      injector = { enabled = true }
-      csi      = { enabled = false }
-      ui       = { enabled = true }
-    })
-
-    ha = yamlencode({
-      server = {
-        enabled = true
-        ha = {
-          enabled   = true
-          replicas  = 3
-          setNodeId = true
-          raft = {
-            enabled = true
-            config  = <<-EOF
-              ui = true
-              listener "tcp" {
-                tls_disable     = 1
-                address         = "[::]:8200"
-                cluster_address = "[::]:8201"
-              }
-              storage "raft" {
-                path = "/vault/data"
-                retry_join {
-                  leader_api_addr = "http://vault-0.vault-internal:8200"
-                }
-                retry_join {
-                  leader_api_addr = "http://vault-1.vault-internal:8200"
-                }
-                retry_join {
-                  leader_api_addr = "http://vault-2.vault-internal:8200"
-                }
-              }
-              seal "awskms" {
-                region     = "${local.region}"
-                kms_key_id = "${dependency.kms.outputs.vault_unseal_key_id}"
-              }
-              service_registration "kubernetes" {}
-            EOF
-          }
-        }
-        dataStorage = {
-          enabled      = true
-          size         = "10Gi"
-          storageClass = null
-        }
-        extraEnvironmentVars = {
-          VAULT_SEAL_TYPE          = "awskms"
-          VAULT_AWSKMS_SEAL_KEY_ID = dependency.kms.outputs.vault_unseal_key_id
-          AWS_REGION               = local.region
-        }
-      }
-      injector = { enabled = true }
-      csi      = { enabled = true }
-      ui       = { enabled = true }
-    })
-  }[local.env_cfg.locals.vault_mode]
 }

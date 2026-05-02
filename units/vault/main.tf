@@ -1,5 +1,67 @@
 locals {
   vault_service_account_name = "vault"
+  ssm_token_name             = "/terragrunt-infra/vault/root-token"
+  ssm_endpoint_arg           = var.ssm_endpoint != "" ? "--endpoint-url ${var.ssm_endpoint}" : ""
+  ssm_env_prefix             = var.ssm_endpoint != "" ? "AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=${var.region}" : "AWS_DEFAULT_REGION=${var.region}"
+
+  helm_values_dev = yamlencode({
+    server = {
+      enabled = true
+      dev = {
+        enabled      = true
+        devRootToken = var.dev_root_token
+      }
+    }
+    injector = { enabled = true }
+    csi      = { enabled = false }
+    ui       = { enabled = true }
+  })
+
+  helm_values_ha = yamlencode({
+    server = {
+      enabled = true
+      ha = {
+        enabled   = true
+        replicas  = 3
+        setNodeId = true
+        raft = {
+          enabled = true
+          config  = <<-EOF
+            ui = true
+            listener "tcp" {
+              tls_disable     = 1
+              address         = "[::]:8200"
+              cluster_address = "[::]:8201"
+            }
+            storage "raft" {
+              path = "/vault/data"
+              retry_join { leader_api_addr = "http://vault-0.vault-internal:8200" }
+              retry_join { leader_api_addr = "http://vault-1.vault-internal:8200" }
+              retry_join { leader_api_addr = "http://vault-2.vault-internal:8200" }
+            }
+            seal "awskms" {
+              region     = "${var.region}"
+              kms_key_id = "${var.kms_key_id}"
+            }
+            service_registration "kubernetes" {}
+          EOF
+        }
+      }
+      dataStorage = {
+        enabled      = true
+        size         = "10Gi"
+        storageClass = null
+      }
+      extraEnvironmentVars = {
+        VAULT_SEAL_TYPE          = "awskms"
+        VAULT_AWSKMS_SEAL_KEY_ID = var.kms_key_id
+        AWS_REGION               = var.region
+      }
+    }
+    injector = { enabled = true }
+    csi      = { enabled = true }
+    ui       = { enabled = true }
+  })
 }
 
 resource "helm_release" "vault" {
@@ -10,7 +72,7 @@ resource "helm_release" "vault" {
   namespace        = "vault"
   create_namespace = true
 
-  values = [var.helm_values]
+  values = [var.vault_mode == "ha" ? local.helm_values_ha : local.helm_values_dev]
 
   set = var.vault_mode == "ha" ? [
     {
@@ -41,114 +103,12 @@ resource "helm_release" "vault_secrets_operator" {
   depends_on = [helm_release.vault]
 }
 
-locals {
-  ssm_token_name   = "/terragrunt-infra/vault/root-token"
-  ssm_endpoint_arg = var.ssm_endpoint != "" ? "--endpoint-url ${var.ssm_endpoint}" : ""
-  ssm_env_prefix   = var.ssm_endpoint != "" ? "AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=${var.region}" : "AWS_DEFAULT_REGION=${var.region}"
-}
-
-resource "terraform_data" "vault_init" {
-  depends_on = [helm_release.vault, helm_release.vault_secrets_operator]
-
-  provisioner "local-exec" {
-    interpreter = ["bash", "-c"]
-    environment = {
-      KUBECONFIG = var.kubeconfig_path
-    }
-    command = <<-EOF
-      set -euo pipefail
-
-      if [ "${var.vault_mode}" = "dev" ]; then
-        echo "Waiting for Vault pods (dev mode)..."
-        kubectl wait --for=condition=ready pod \
-          -l app.kubernetes.io/name=vault \
-          -n vault --timeout=300s
-
-        # Dev mode: already unsealed, token is known
-        echo "Dev mode — storing root token in SSM..."
-        ${local.ssm_env_prefix} \
-        aws ssm put-parameter \
-          --name "${local.ssm_token_name}" \
-          --value "${var.dev_root_token}" \
-          --type SecureString \
-          --overwrite \
-          ${local.ssm_endpoint_arg}
-        echo "Done."
-      else
-        # HA mode: pods start sealed/uninitialized — readiness probe fails until init+unseal.
-        # Wait for Running phase only (not Ready), then connect and init.
-        echo "Waiting for vault-0 to be Running..."
-        for i in $(seq 1 30); do
-          PHASE=$(kubectl get pod vault-0 -n vault -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-          [ "$PHASE" = "Running" ] && { echo "vault-0 is Running"; break; }
-          echo "  phase=$PHASE attempt $i/30, retrying in 10s..."
-          sleep 10
-        done
-
-        kubectl port-forward svc/vault 18200:8200 -n vault &
-        PF_PID=$!
-        trap "kill $PF_PID 2>/dev/null || true" EXIT
-        sleep 5
-
-        export VAULT_ADDR="http://127.0.0.1:18200"
-
-        # vault status exits 2 when sealed (reachable but not unsealed) — that is OK here.
-        echo "Waiting for Vault API to respond..."
-        for i in $(seq 1 30); do
-          STATUS_JSON=$(vault status -format=json 2>/dev/null || true)
-          [ -n "$STATUS_JSON" ] && { echo "Vault responded"; break; }
-          echo "  attempt $i/30, retrying in 10s..."
-          sleep 10
-        done
-
-        INITIALIZED=$(echo "$STATUS_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['initialized'])" 2>/dev/null || echo "false")
-
-        if [ "$INITIALIZED" = "False" ] || [ "$INITIALIZED" = "false" ]; then
-          echo "Initializing Vault..."
-          INIT_JSON=$(vault operator init \
-            -recovery-shares=5 \
-            -recovery-threshold=3 \
-            -format=json)
-
-          ROOT_TOKEN=$(echo "$INIT_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['root_token'])")
-
-          echo "Storing root token in SSM..."
-          AWS_DEFAULT_REGION="${var.region}" \
-          aws ssm put-parameter \
-            --name "${local.ssm_token_name}" \
-            --value "$ROOT_TOKEN" \
-            --type SecureString \
-            --overwrite
-
-          echo "Storing recovery keys in SSM..."
-          for i in 0 1 2 3 4; do
-            KEY=$(echo "$INIT_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['recovery_keys_b64'][$i])")
-            AWS_DEFAULT_REGION="${var.region}" \
-            aws ssm put-parameter \
-              --name "/terragrunt-infra/vault/recovery-key-$i" \
-              --value "$KEY" \
-              --type SecureString \
-              --overwrite
-          done
-
-          echo "Vault initialized and root token stored."
-        else
-          echo "Vault already initialized, skipping."
-        fi
-      fi
-    EOF
-  }
-
-  triggers_replace = [
-    var.vault_mode,
-    helm_release.vault.metadata.app_version,
-    helm_release.vault.version,
-  ]
-}
-
 data "aws_ssm_parameter" "vault_root_token" {
   name            = local.ssm_token_name
   with_decryption = true
 
-  depends_on = [terraform_data.vault_init]
+  depends_on = [
+    terraform_data.vault_init_dev,
+    terraform_data.vault_init_ha,
+  ]
 }

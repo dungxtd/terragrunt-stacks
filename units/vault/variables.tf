@@ -3,9 +3,10 @@ variable "region" {
   type        = string
 }
 
-variable "helm_values" {
-  description = "YAML-encoded Helm values for the Vault chart"
+variable "kms_key_id" {
+  description = "KMS key ID for Vault auto-unseal (HA mode)"
   type        = string
+  default     = ""
 }
 
 variable "vault_mode" {
@@ -19,9 +20,9 @@ variable "vault_mode" {
 }
 
 variable "dev_root_token" {
-  description = "Root token for dev mode. Only used when vault_mode = 'dev'."
+  description = "Root token for dev mode"
   type        = string
-  default     = ""
+  default     = "root"
   sensitive   = true
 }
 
@@ -32,12 +33,12 @@ variable "vault_irsa_role_arn" {
 }
 
 variable "ssm_endpoint" {
-  description = "SSM endpoint override for MiniStack"
+  description = "SSM endpoint override for MiniStack (LocalStack)"
   type        = string
   default     = ""
 }
 
 variable "kubeconfig_path" {
-  description = "Path to kubeconfig used by kubectl in init"
+  description = "Path to kubeconfig for kubectl exec during vault init"
   type        = string
 }

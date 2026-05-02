@@ -9,7 +9,7 @@ output "vault_namespace" {
 }
 
 output "vault_root_token" {
-  description = "Vault root token (retrieved from SSM after auto-init)"
+  description = "Vault root token (from SSM after init)"
   value       = data.aws_ssm_parameter.vault_root_token.value
   sensitive   = true
 }

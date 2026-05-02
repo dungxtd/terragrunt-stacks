@@ -7,7 +7,3 @@ include "k8s" {
   expose = true
 }
 
-inputs = {
-  external_ca = false
-  enable_viz  = true
-}
