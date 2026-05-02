@@ -66,9 +66,10 @@ docs/              architecture.md, adr/, runbooks/, archive/
 
 ## Docs
 
+- **[Platform Guide](docs/PLATFORM_GUIDE.md)** — components, end-to-end flows, all use cases (start here)
 - [Architecture](docs/architecture.md) — network topology, vault flow, env comparison
 - [ADRs](docs/adr/) — decisions: mesh choice, vault dev mode, ALB grouping
-- [Runbooks](docs/runbooks/) — fix recipes: canary stuck, consul stale services
+- [Runbooks](docs/runbooks/) — fix recipes: canary stuck, consul stale services, vault HA migration
 - [GitOps](gitops/README.md) — App-of-Apps layout, sync waves, payments-app chart
 
 ## Prerequisites
