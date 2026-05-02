@@ -51,7 +51,9 @@ jobs:
         uses: azure/setup-kubectl@v5
 
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }} || \
+            echo "kubeconfig not generated (cluster may not exist yet — first deploy)"
 
       - name: Apply App-of-Apps root
         run: |

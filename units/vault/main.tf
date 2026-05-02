@@ -58,12 +58,12 @@ resource "terraform_data" "vault_init" {
     command = <<-EOF
       set -euo pipefail
 
-      echo "Waiting for Vault pods..."
-      kubectl wait --for=condition=ready pod \
-        -l app.kubernetes.io/name=vault \
-        -n vault --timeout=300s
-
       if [ "${var.vault_mode}" = "dev" ]; then
+        echo "Waiting for Vault pods (dev mode)..."
+        kubectl wait --for=condition=ready pod \
+          -l app.kubernetes.io/name=vault \
+          -n vault --timeout=300s
+
         # Dev mode: already unsealed, token is known
         echo "Dev mode — storing root token in SSM..."
         ${local.ssm_env_prefix} \
@@ -75,7 +75,16 @@ resource "terraform_data" "vault_init" {
           ${local.ssm_endpoint_arg}
         echo "Done."
       else
-        # HA mode: port-forward and run vault operator init
+        # HA mode: pods start sealed/uninitialized — readiness probe fails until init+unseal.
+        # Wait for Running phase only (not Ready), then connect and init.
+        echo "Waiting for vault-0 to be Running..."
+        for i in $(seq 1 30); do
+          PHASE=$(kubectl get pod vault-0 -n vault -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+          [ "$PHASE" = "Running" ] && { echo "vault-0 is Running"; break; }
+          echo "  phase=$PHASE attempt $i/30, retrying in 10s..."
+          sleep 10
+        done
+
         kubectl port-forward svc/vault 18200:8200 -n vault &
         PF_PID=$!
         trap "kill $PF_PID 2>/dev/null || true" EXIT
@@ -83,7 +92,16 @@ resource "terraform_data" "vault_init" {
 
         export VAULT_ADDR="http://127.0.0.1:18200"
 
-        INITIALIZED=$(vault status -format=json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['initialized'])" 2>/dev/null || echo "false")
+        # vault status exits 2 when sealed (reachable but not unsealed) — that is OK here.
+        echo "Waiting for Vault API to respond..."
+        for i in $(seq 1 30); do
+          STATUS_JSON=$(vault status -format=json 2>/dev/null || true)
+          [ -n "$STATUS_JSON" ] && { echo "Vault responded"; break; }
+          echo "  attempt $i/30, retrying in 10s..."
+          sleep 10
+        done
+
+        INITIALIZED=$(echo "$STATUS_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['initialized'])" 2>/dev/null || echo "false")
 
         if [ "$INITIALIZED" = "False" ] || [ "$INITIALIZED" = "false" ]; then
           echo "Initializing Vault..."

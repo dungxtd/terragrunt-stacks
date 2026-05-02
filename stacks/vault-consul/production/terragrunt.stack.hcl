@@ -50,19 +50,24 @@ unit "vault_config" {
 
 # ── Layer 6: Platform + GitOps ───────────────────────────────────
 
-unit "linkerd" {
-  source = "../../../units/linkerd"
-  path   = "linkerd"
-}
-
-unit "argocd" {
-  source = "../../../units/argocd"
-  path   = "argocd"
-}
-
 unit "aws_alb" {
   source = "../../../units/aws-alb"
   path   = "aws-alb"
+}
+
+# linkerd and argocd depend on aws_alb: ALB controller registers a MutatingWebhook
+# (mservice.elbv2.k8s.aws). If the ALB pod isn't ready when Linkerd creates Services,
+# the webhook call fails. Explicit dependency ensures ALB is up first.
+unit "linkerd" {
+  source     = "../../../units/linkerd"
+  path       = "linkerd"
+  depends_on = [unit.aws_alb]
+}
+
+unit "argocd" {
+  source     = "../../../units/argocd"
+  path       = "argocd"
+  depends_on = [unit.aws_alb]
 }
 
 # ── Layer 7: CI/CD Runner ────────────────────────────────────────
