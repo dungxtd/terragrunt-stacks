@@ -32,8 +32,6 @@ data "aws_secretsmanager_secret_version" "rds_master" {
 }
 
 locals {
-  db_endpoint = var.rds_endpoint
-  db_username = var.rds_username
   db_password = length(data.aws_secretsmanager_secret_version.rds_master) > 0 ? jsondecode(data.aws_secretsmanager_secret_version.rds_master[0].secret_string)["password"] : "pending"
 }
 
@@ -48,8 +46,8 @@ resource "vault_database_secret_backend_connection" "postgres" {
   allowed_roles = ["payments"]
 
   postgresql {
-    connection_url = "postgresql://{{username}}:{{password}}@${local.db_endpoint}/payments?sslmode=${var.db_ssl_mode}"
-    username       = local.db_username
+    connection_url = "postgresql://{{username}}:{{password}}@${var.rds_endpoint}/payments?sslmode=${var.db_ssl_mode}"
+    username       = var.rds_username
     password       = local.db_password
   }
 }

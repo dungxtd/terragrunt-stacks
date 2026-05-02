@@ -82,9 +82,3 @@ variable "runner_service_account_annotations" {
   type        = map(string)
   default     = {}
 }
-
-variable "tags" {
-  description = "Common tags"
-  type        = map(string)
-  default     = {}
-}

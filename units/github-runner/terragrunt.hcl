@@ -21,9 +21,4 @@ inputs = {
   github_app_private_key     = get_env("GITHUB_APP_PRIVATE_KEY", "")
   github_pat                 = get_env("GITHUB_PAT", "")
 
-  runner_scale_set_name = "arc-runner"
-  min_runners           = 0
-  max_runners           = 5
-
-  tags = local.common.locals.common_tags
 }

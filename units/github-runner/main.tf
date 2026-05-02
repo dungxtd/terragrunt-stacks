@@ -1,3 +1,7 @@
+# Disabled in all envs (enable_github_runner = false). Enable when self-hosted
+# runners are needed: set enable_github_runner = true in env.hcl and provide
+# GITHUB_APP_* or GITHUB_PAT env vars.
+
 locals {
   controller_namespace = "arc-systems"
   runner_namespace     = "arc-runners"

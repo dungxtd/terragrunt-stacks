@@ -27,8 +27,3 @@ output "vpc_cidr_block" {
   description = "VPC CIDR block"
   value       = module.vpc.vpc_cidr_block
 }
-
-output "region" {
-  description = "AWS region"
-  value       = var.region
-}

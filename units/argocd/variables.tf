@@ -9,9 +9,3 @@ variable "service_type" {
   type        = string
   default     = "LoadBalancer"
 }
-
-variable "tags" {
-  description = "Common tags"
-  type        = map(string)
-  default     = {}
-}

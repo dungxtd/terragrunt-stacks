@@ -7,6 +7,3 @@ include "vault" {
   expose = true
 }
 
-inputs = {
-  organization = "HashiCorp Demo"
-}
