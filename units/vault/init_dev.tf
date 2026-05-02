@@ -31,7 +31,7 @@ resource "terraform_data" "vault_init_dev" {
   }
 
   triggers_replace = [
-    helm_release.vault.metadata[0].app_version,
+    helm_release.vault.metadata.app_version,
     helm_release.vault.version,
   ]
 }
