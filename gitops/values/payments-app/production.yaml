@@ -1,0 +1,156 @@
+namespace: payments-app
+
+mesh: linkerd
+secrets: vault
+
+vault:
+  address: "http://vault.vault.svc.cluster.local:8200"
+
+db:
+  host: "terragrunt-infra-payments.cngggs0q8d4s.ap-southeast-1.rds.amazonaws.com"
+
+ingress:
+  host: gateway.hashiconf.example.com
+
+sops: {}
+
+productDb:
+  database: products
+  username: postgres
+  password: password
+
+services:
+  payments-app:
+    image: hashicorpdemoapp/payments:v0.0.16
+    port: 8080
+    serviceAccount: true
+    linkerdSkipOutboundPorts: "8200,8201"
+    upstreams:
+      - "payments-processor:9090"
+      - "payments-app-database:5432"
+    env:
+      - name: NAME
+        value: "payments-app"
+      - name: JAEGER_DISABLED
+        value: "true"
+      - name: VAULT_ADDR
+        value: "http://vault.vault.svc.cluster.local:8200"
+      - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+        value: "file:/vault/secrets/"
+    startupProbe:
+      httpGet: { path: /actuator/health, port: 8080 }
+      periodSeconds: 5
+      failureThreshold: 36
+    livenessProbe:
+      httpGet: { path: /actuator/health, port: 8080 }
+      periodSeconds: 10
+    readinessProbe:
+      httpGet: { path: /actuator/health, port: 8080 }
+      periodSeconds: 5
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 640Mi }
+    vault:
+      role: payments
+      secret: payments-app/database/creds/payments
+      template: |
+        {{`{{- with secret "payments-app/database/creds/payments" -}}
+        spring.datasource.url=jdbc:postgresql://payments-app-database:5432/payments?sslmode=require
+        spring.datasource.username={{ .Data.username }}
+        spring.datasource.password={{ .Data.password }}
+        spring.datasource.driver-class-name=org.postgresql.Driver
+        spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+        {{- end }}`}}
+
+  payments-processor:
+    image: hashicorpdemoapp/payments:v0.0.16
+    port: 8080
+    servicePort: 9090   # external 9090 → container 8080 (callers use payments-processor:9090)
+    serviceAccount: true
+    env:
+      - name: NAME
+        value: "payments-processor"
+      - name: ADMIN_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: payments-processor-creds
+            key: password
+    resources:
+      requests: { cpu: 100m, memory: 384Mi }
+      limits:   { cpu: 500m, memory: 768Mi }
+
+  public-api:
+    image: hashicorpdemoapp/public-api:v0.0.7
+    port: 8080
+    upstreams:
+      - "payments-app:8080"
+    env:
+      - name: BIND_ADDRESS
+        value: ":8080"
+      - name: METRICS_ADDRESS
+        value: ":9102"
+      - name: PAYMENT_API_URI
+        value: "http://payments-app:8080"
+      - name: PRODUCT_API_URI
+        value: "http://product-api:9090"
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits:   { cpu: 200m, memory: 128Mi }
+
+  product-api:
+    image: hashicorpdemoapp/product-api:v0.0.20
+    port: 9090
+    volumes:
+      - name: product-api-config
+        configMap:
+          name: product-api-config
+    volumeMounts:
+      - name: product-api-config
+        mountPath: /conf.json
+        subPath: conf.json
+    readinessProbe:
+      httpGet: { path: /health, port: 9090 }
+      periodSeconds: 5
+    livenessProbe:
+      httpGet: { path: /health, port: 9090 }
+      periodSeconds: 10
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits:   { cpu: 200m, memory: 128Mi }
+
+  product-db:
+    image: hashicorpdemoapp/product-api-db:v0.0.20
+    port: 5432
+    portName: postgres
+    mesh: false   # local Postgres, no sidecar
+    env:
+      - name: POSTGRES_DB
+        value: "products"
+      - name: POSTGRES_USER
+        value: "postgres"
+      - name: POSTGRES_PASSWORD
+        value: "password"
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits:   { cpu: 250m, memory: 256Mi }
+
+  frontend:
+    image: hashicorpdemoapp/frontend-nginx:v1.0.9
+    port: 80
+    upstreams:
+      - "public-api:8080"
+    env:
+      - name: NEXT_PUBLIC_PUBLIC_API_URL
+        value: "/"
+      - name: NEXT_PUBLIC_FOOTER_FLAG
+        value: "HashiCups"
+    volumes:
+      - name: nginx-conf
+        configMap:
+          name: frontend-nginx-conf
+    volumeMounts:
+      - name: nginx-conf
+        mountPath: /etc/nginx/conf.d
+    resources:
+      requests: { cpu: 50m, memory: 32Mi }
+      limits:   { cpu: 100m, memory: 64Mi }

@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: payments-app
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/dungxtd/terragrunt-stacks
+      targetRevision: main
+      path: gitops/charts/payments-app
+      helm:
+        valueFiles:
+          - $values/gitops/values/payments-app/production.yaml
+    - repoURL: https://github.com/dungxtd/terragrunt-stacks
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: payments-app
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: payments-app
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: Service
+      name: payments-app
+      jsonPointers:
+        - /spec/selector
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

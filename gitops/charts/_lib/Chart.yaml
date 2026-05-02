@@ -1,0 +1,5 @@
+apiVersion: v2
+name: lib
+description: Shared template library for payments-app chart family
+type: library
+version: 0.1.0

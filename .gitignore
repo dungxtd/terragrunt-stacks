@@ -38,3 +38,6 @@ set_env_local.sh
 .idea/
 *.swp
 *.swo
+
+# Helm chart dependencies — KEEP committed for ArgoCD multi-source rendering.
+# ArgoCD's repo-server does not run `helm dep update`; the .tgz must be vendored.

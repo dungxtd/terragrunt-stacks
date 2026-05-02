@@ -7,7 +7,6 @@ spec:
   generators:
     - list:
         elements:
-          # ── Wave 1: Service Mesh ──────────────────────────────
           - app: consul
             repoURL: https://helm.releases.hashicorp.com
             chart: consul
@@ -15,8 +14,6 @@ spec:
             namespace: consul
             wave: "1"
 
-          # ── Wave 2: Infrastructure controllers ───────────────
-          # aws-alb managed by Terraform (units/aws-alb) — needs IRSA
           - app: datadog
             repoURL: https://helm.datadoghq.com
             chart: datadog
@@ -24,7 +21,6 @@ spec:
             namespace: datadog
             wave: "2"
 
-          # ── Wave 3: Progressive Delivery ─────────────────────
           - app: flagger
             repoURL: https://flagger.app
             chart: flagger
@@ -46,7 +42,7 @@ spec:
           targetRevision: "{{targetRevision}}"
           helm:
             valueFiles:
-              - $values/gitops/values/{{app}}.yaml
+              - $values/gitops/values/{{app}}/production.yaml
         - repoURL: https://github.com/dungxtd/terragrunt-stacks
           targetRevision: main
           ref: values
@@ -88,41 +84,3 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
----
-# payments-app deployed from this git repo (Helm chart in gitops/charts/)
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: payments-app
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "4"
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/dungxtd/terragrunt-stacks
-    targetRevision: main
-    path: gitops/charts/payments-app
-    helm:
-      valueFiles:
-        - values/vault-consul.yaml
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: payments-app
-  ignoreDifferences:
-    - group: apps
-      kind: Deployment
-      name: payments-app
-      jsonPointers:
-        - /spec/replicas
-    - group: ""
-      kind: Service
-      name: payments-app
-      jsonPointers:
-        - /spec/selector
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true

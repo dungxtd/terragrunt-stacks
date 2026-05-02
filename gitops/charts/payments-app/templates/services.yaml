@@ -1,0 +1,3 @@
+{{- range $name, $svc := .Values.services }}
+{{- include "lib.workload" (dict "name" $name "svc" $svc "ctx" $) }}
+{{- end }}

@@ -1,0 +1,27 @@
+# App-of-Apps root: ArgoCD watches gitops/apps/ and creates child Applications
+# automatically. Push a new file here → ArgoCD creates the app on next reconcile.
+# This file itself is applied once via `kubectl apply -f gitops/apps/root.yaml`
+# (handled by the gitops.yml CI workflow).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dungxtd/terragrunt-stacks
+    targetRevision: main
+    path: gitops/apps
+    directory:
+      recurse: false
+      exclude: root.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
