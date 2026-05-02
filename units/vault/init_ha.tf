@@ -19,7 +19,7 @@ resource "terraform_data" "vault_init_ha" {
       for i in $(seq 1 30); do
         PHASE=$(kubectl get pod vault-0 -n vault -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
         [ "$PHASE" = "Running" ] && { echo "vault-0 is Running"; break; }
-        echo "  phase=${PHASE:-pending} attempt $i/30, retrying in 10s..."
+        echo "  phase=$${PHASE:-pending} attempt $i/30, retrying in 10s..."
         sleep 10
       done
 
