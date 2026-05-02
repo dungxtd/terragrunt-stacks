@@ -1,5 +1,9 @@
 datadog:
   site: datadoghq.com
+  # Secret created by ExternalSecret datadog-api-key (gitops/secret-stores/).
+  # Vault path: secret/datadog/api → keys: key (api), app (app key).
+  apiKeyExistingSecret: datadog
+  appKeyExistingSecret: datadog
   logs:
     enabled: true
     containerCollectAll: true

@@ -1,0 +1,33 @@
+vault:
+  address: "http://vault.vault.svc.cluster.local:8200"
+  kvPath:  "secret"
+  k8sAuthMount: "kubernetes"
+  role: "external-secrets"
+
+# Single source of truth for ALL ExternalSecrets.
+# Add a new entry → ESO creates k8s Secret on next sync.
+#
+# Default mode: dataFrom extract — all Vault fields become Secret keys verbatim.
+# Use dataKeys: { k8sKey: vaultField } when chart consumer expects different names.
+externalSecrets:
+  datadog-api-key:
+    namespace: datadog
+    target:    datadog       # Secret name datadog chart looks for via apiKeyExistingSecret
+    vaultPath: datadog/api
+    # Datadog chart expects keys api-key + app-key.
+    # Vault put: vault kv put secret/datadog/api api-key=$DD_API_KEY app-key=$DD_APP_KEY
+    # Then default `dataFrom: extract` works — fields named api-key, app-key.
+
+  # Examples for future secrets — uncomment + fill once Vault paths exist:
+  #
+  # payments-app-db:
+  #   namespace: payments-app
+  #   target:    payments-app-db-creds
+  #   vaultPath: payments-app/db
+  #
+  # github-app:
+  #   namespace: argocd
+  #   vaultPath: github/app-creds
+  #   dataKeys:                      # explicit when k8s name ≠ Vault name
+  #     id:          app-id
+  #     private-key: pem

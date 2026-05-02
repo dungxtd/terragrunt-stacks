@@ -1,6 +1,16 @@
 name: Deploy GitOps
 
 on:
+  # Chain after Deploy Infrastructure: if a push touches both units/ and gitops/,
+  # GitHub fires deploy.yml + gitops.yml in parallel. workflow_run gates this
+  # workflow on deploy.yml succeeding first, so Vault roles / IRSA / CRDs the
+  # gitops layer depends on are guaranteed to exist before ArgoCD reconciles.
+  workflow_run:
+    workflows: ["Deploy Infrastructure"]
+    types: [completed]
+    branches: [main]
+  # Direct trigger when ONLY gitops/ files change (deploy.yml's paths allow-list
+  # excludes gitops/, so it doesn't fire — no race possible).
   push:
     branches: [main]
     paths:
@@ -21,9 +31,15 @@ jobs:
     name: Sync GitOps
     runs-on: ubuntu-latest
     environment: production
+    # Skip if upstream Deploy Infrastructure failed/cancelled.
+    # When triggered by push (no upstream), event is 'push' and condition true.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          # workflow_run uses default branch SHA; pin to triggering commit for traceability
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v6

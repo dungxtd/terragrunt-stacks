@@ -1,0 +1,20 @@
+installCRDs: true
+
+replicaCount: 1
+podAnnotations:
+  linkerd.io/inject: disabled
+  consul.hashicorp.com/connect-inject: "false"
+
+# Skip mesh injection on ESO control-plane pods. Webhook must accept k8s API
+# server connections without proxy interference.
+webhook:
+  replicaCount: 1
+  podAnnotations:
+    linkerd.io/inject: disabled
+    consul.hashicorp.com/connect-inject: "false"
+
+certController:
+  replicaCount: 1
+  podAnnotations:
+    linkerd.io/inject: disabled
+    consul.hashicorp.com/connect-inject: "false"

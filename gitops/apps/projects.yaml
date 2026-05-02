@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"   # before any Application referencing project: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: payments-app platform — vault, mesh, GitOps
+
+  sourceRepos:
+    - https://github.com/dungxtd/terragrunt-stacks
+    - https://helm.releases.hashicorp.com
+    - https://helm.datadoghq.com
+    - https://flagger.app
+    - https://charts.external-secrets.io
+
+  destinations:
+    - { server: https://kubernetes.default.svc, namespace: consul }
+    - { server: https://kubernetes.default.svc, namespace: datadog }
+    - { server: https://kubernetes.default.svc, namespace: flagger-system }
+    - { server: https://kubernetes.default.svc, namespace: payments-app }
+    - { server: https://kubernetes.default.svc, namespace: argocd }
+    - { server: https://kubernetes.default.svc, namespace: vault }
+    - { server: https://kubernetes.default.svc, namespace: linkerd-viz }
+    - { server: https://kubernetes.default.svc, namespace: external-secrets }
+
+  clusterResourceWhitelist:
+    - { group: "",                              kind: Namespace }
+    - { group: rbac.authorization.k8s.io,       kind: ClusterRole }
+    - { group: rbac.authorization.k8s.io,       kind: ClusterRoleBinding }
+    - { group: admissionregistration.k8s.io,    kind: MutatingWebhookConfiguration }
+    - { group: admissionregistration.k8s.io,    kind: ValidatingWebhookConfiguration }
+    - { group: apiextensions.k8s.io,            kind: CustomResourceDefinition }
+    - { group: external-secrets.io,             kind: ClusterSecretStore }
+    - { group: scheduling.k8s.io,               kind: PriorityClass }
+
+  roles:
+    - name: read-only
+      policies:
+        - p, proj:platform:read-only, applications, get, platform/*, allow
+    - name: deployer
+      policies:
+        - p, proj:platform:deployer, applications, sync, platform/*, allow
+        - p, proj:platform:deployer, applications, action/*, platform/*, allow
