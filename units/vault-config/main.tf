@@ -18,8 +18,9 @@ resource "vault_mount" "transit" {
 }
 
 resource "vault_transit_secret_backend_key" "payments" {
-  backend = vault_mount.transit.path
-  name    = "payments-app"
+  backend          = vault_mount.transit.path
+  name             = "payments-app"
+  deletion_allowed = true
 }
 
 # ── Database Secrets Engine ──────────────────────────────────────

@@ -38,7 +38,7 @@ env:
   TG_FLAGS: --non-interactive --backend-bootstrap
   STATE_BUCKET: tf-state-terragrunt-stacks
   STATE_PREFIX: stacks/vault-consul/production
-  STATE_UNITS: vpc eks kms rds vault certs vault-config linkerd argocd aws-alb github-runner
+  STATE_UNITS: vpc eks kms rds vault-irsa vault certs vault-config linkerd argocd aws-alb github-runner
 
 jobs:
   validate:
