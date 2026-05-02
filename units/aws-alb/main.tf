@@ -1,8 +1,10 @@
 module "alb_irsa" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
   version = "~> 6.6"
 
-  role_name = "${var.project}-alb-controller"
+  # v6 renamed `role_name` → `name`; submodule renamed (-eks suffix dropped).
+  name            = "${var.project}-alb-controller"
+  use_name_prefix = false
 
   attach_load_balancer_controller_policy = true
 

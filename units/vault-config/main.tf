@@ -168,14 +168,7 @@ resource "vault_kubernetes_auth_backend_role" "external_secrets" {
   token_ttl                        = 3600
 }
 
-# Enable KV-v2 secret engine if not already mounted (idempotent).
-resource "vault_mount" "kv" {
-  path        = "secret"
-  type        = "kv"
-  options     = { version = "2" }
-  description = "KV-v2 store for application secrets read by ExternalSecrets"
-
-  lifecycle {
-    ignore_changes = [options] # vault may rewrite version field
-  }
-}
+# KV-v2 mount at `secret/` is created automatically by Vault dev mode at startup.
+# In HA mode (vault_mode = "ha"), enable manually once after init:
+#   vault secrets enable -path=secret -version=2 kv
+# Not declared here because TF would conflict with dev-mode auto-mount on every apply.
