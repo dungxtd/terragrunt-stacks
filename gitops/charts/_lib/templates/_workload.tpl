@@ -95,5 +95,5 @@ spec:
     - port: {{ default $svc.port $svc.servicePort }}
       targetPort: {{ $svc.port }}
       name: {{ default "http" $svc.portName }}
-{{- end }}
+{{ end }}
 {{- end }}
