@@ -1,6 +1,6 @@
 # HA mode (production): Vault pods start sealed/uninitialized — readiness probe
 # fails until operator init runs. Poll Running phase, then use kubectl exec to
-# call Vault's API on 127.0.0.1:8200 inside vault-0 (no port-forward needed).
+# run vault CLI inside vault-0 (curl not available in container image).
 
 resource "terraform_data" "vault_init_ha" {
   count = var.vault_mode == "ha" ? 1 : 0
@@ -26,14 +26,15 @@ resource "terraform_data" "vault_init_ha" {
       echo "Waiting for Vault API to respond..."
       for i in $(seq 1 30); do
         STATUS=$(kubectl exec vault-0 -n vault -- \
-          curl -sf http://127.0.0.1:8200/v1/sys/init 2>/dev/null || true)
+          env VAULT_ADDR=http://127.0.0.1:8200 \
+          vault status -format=json 2>/dev/null || true)
         [ -n "$STATUS" ] && { echo "Vault API ready"; break; }
         echo "  attempt $i/30, retrying in 10s..."
         sleep 10
       done
 
       INITIALIZED=$(echo "$STATUS" | python3 -c \
-        "import sys,json; print(json.load(sys.stdin)['initialized'])" 2>/dev/null || echo "false")
+        "import sys,json; print(json.load(sys.stdin)['initialized'])" 2>/dev/null || echo "False")
 
       if [ "$INITIALIZED" = "True" ]; then
         echo "Vault already initialized, skipping."
@@ -42,9 +43,11 @@ resource "terraform_data" "vault_init_ha" {
 
       echo "Initializing Vault..."
       INIT=$(kubectl exec vault-0 -n vault -- \
-        curl -sf -X PUT http://127.0.0.1:8200/v1/sys/init \
-        -H "Content-Type: application/json" \
-        -d '{"recovery_shares":5,"recovery_threshold":3}')
+        env VAULT_ADDR=http://127.0.0.1:8200 \
+        vault operator init \
+          -recovery-shares=5 \
+          -recovery-threshold=3 \
+          -format=json)
 
       ROOT_TOKEN=$(echo "$INIT" | python3 -c \
         "import sys,json; print(json.load(sys.stdin)['root_token'])")
