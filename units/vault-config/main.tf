@@ -90,6 +90,15 @@ resource "vault_kv_secret_v2" "payments_processor_creds" {
   })
 }
 
+# Vault dev mode creates `secret/` automatically. HA mode does not, but GitOps
+# ExternalSecrets intentionally use the same `secret/...` paths in both modes.
+resource "vault_mount" "secret" {
+  count = var.vault_mode == "ha" ? 1 : 0
+
+  path = "secret"
+  type = "kv-v2"
+}
+
 # ── Vault Policies ───────────────────────────────────────────────
 
 resource "vault_policy" "payments_app" {
@@ -167,8 +176,3 @@ resource "vault_kubernetes_auth_backend_role" "external_secrets" {
   token_policies                   = [vault_policy.external_secrets.name]
   token_ttl                        = 3600
 }
-
-# KV-v2 mount at `secret/` is created automatically by Vault dev mode at startup.
-# In HA mode (vault_mode = "ha"), enable manually once after init:
-#   vault secrets enable -path=secret -version=2 kv
-# Not declared here because TF would conflict with dev-mode auto-mount on every apply.

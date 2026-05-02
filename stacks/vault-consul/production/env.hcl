@@ -71,8 +71,8 @@ locals {
   kubeconfig_path     = pathexpand("~/.kube/config")
   kubeconfig_hook_cmd = "aws eks update-kubeconfig --name terragrunt-infra-eks --region ap-southeast-1 && echo '✓ aws kubeconfig ready'"
 
-  # Vault — dev mode for freetear (no PVC, single replica). Switch to "ha" for real prod.
-  vault_mode      = "dev"
+  # Vault — production mode uses HA Raft with KMS auto-unseal.
+  vault_mode      = "ha"
   dev_root_token  = "root"
   ssm_endpoint    = ""
   vault_token_cmd = "aws ssm get-parameter --name /terragrunt-infra/vault/root-token --with-decryption --query Parameter.Value --output text 2>/dev/null || echo root"

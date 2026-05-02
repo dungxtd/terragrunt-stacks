@@ -26,6 +26,11 @@ unit "rds" {
   path   = "rds"
 }
 
+unit "vault_irsa" {
+  source = "../../../units/vault-irsa"
+  path   = "vault-irsa"
+}
+
 unit "vault" {
   source = "../../../units/vault"
   path   = "vault"

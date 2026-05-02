@@ -14,6 +14,16 @@ variable "kubernetes_ca_cert" {
   default     = ""
 }
 
+variable "vault_mode" {
+  description = "Vault deployment mode from the environment config"
+  type        = string
+
+  validation {
+    condition     = contains(["dev", "ha"], var.vault_mode)
+    error_message = "vault_mode must be 'dev' or 'ha'."
+  }
+}
+
 variable "rds_endpoint" {
   description = "RDS endpoint (host:port)"
   type        = string

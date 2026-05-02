@@ -37,6 +37,7 @@ docs/                 — architecture.md, adr/, runbooks/, archive/
 | eks | 2 | EKS / k3s cluster |
 | kms | 3 | KMS key for Vault auto-unseal |
 | rds | 4 | PostgreSQL RDS |
+| vault-irsa | 4 | AWS HA only: IAM role for Vault KMS auto-unseal |
 | vault | 4 | Vault on k8s (Helm) |
 | certs | 5 | TLS certs (tls provider) |
 | vault-config | 5 | Vault secrets engines, PKI, DB dynamic creds |

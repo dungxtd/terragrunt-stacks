@@ -39,6 +39,7 @@ inputs = {
   vault_address      = dependency.vault.outputs.vault_address
   kubernetes_host    = dependency.eks.outputs.cluster_endpoint
   kubernetes_ca_cert = base64decode(dependency.eks.outputs.cluster_certificate_authority_data)
+  vault_mode         = local._env_cfg.locals.vault_mode
 
   # Env config provides overrides; empty string → fall back to real RDS outputs.
   rds_endpoint          = coalesce(local._env_cfg.locals.rds_endpoint_override, dependency.rds.outputs.rds_endpoint, "NOT_YET_DEPLOYED")

@@ -1,3 +1,7 @@
+locals {
+  vault_service_account_name = "vault"
+}
+
 resource "helm_release" "vault" {
   name             = "vault"
   repository       = "https://helm.releases.hashicorp.com"
@@ -7,6 +11,23 @@ resource "helm_release" "vault" {
   create_namespace = true
 
   values = [var.helm_values]
+
+  set = var.vault_mode == "ha" ? [
+    {
+      name  = "server.serviceAccount.create"
+      value = "true"
+    },
+    {
+      name  = "server.serviceAccount.name"
+      value = local.vault_service_account_name
+      type  = "string"
+    },
+    {
+      name  = "server.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+      value = var.vault_irsa_role_arn
+      type  = "string"
+    },
+  ] : []
 }
 
 resource "helm_release" "vault_secrets_operator" {
@@ -67,8 +88,8 @@ resource "terraform_data" "vault_init" {
         if [ "$INITIALIZED" = "False" ] || [ "$INITIALIZED" = "false" ]; then
           echo "Initializing Vault..."
           INIT_JSON=$(vault operator init \
-            -recovery-shares=1 \
-            -recovery-threshold=1 \
+            -recovery-shares=5 \
+            -recovery-threshold=3 \
             -format=json)
 
           ROOT_TOKEN=$(echo "$INIT_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['root_token'])")
@@ -81,6 +102,17 @@ resource "terraform_data" "vault_init" {
             --type SecureString \
             --overwrite
 
+          echo "Storing recovery keys in SSM..."
+          for i in 0 1 2 3 4; do
+            KEY=$(echo "$INIT_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['recovery_keys_b64'][$i])")
+            AWS_DEFAULT_REGION="${var.region}" \
+            aws ssm put-parameter \
+              --name "/terragrunt-infra/vault/recovery-key-$i" \
+              --value "$KEY" \
+              --type SecureString \
+              --overwrite
+          done
+
           echo "Vault initialized and root token stored."
         else
           echo "Vault already initialized, skipping."
@@ -90,6 +122,7 @@ resource "terraform_data" "vault_init" {
   }
 
   triggers_replace = [
+    var.vault_mode,
     helm_release.vault.metadata.app_version,
     helm_release.vault.version,
   ]

@@ -38,13 +38,11 @@ ls -la /tmp/vault-backup-*.json   # KEEP THESE FILES SAFE
 ## Migration
 
 ```bash
-# 1. Flip env to HA (requires manual edit — see line 80 of stacks/vault-consul/production/env.hcl)
-sed -i.bak 's/^  vault_mode      = "dev"/  vault_mode      = "ha"/' \
-  stacks/vault-consul/production/env.hcl
+# 1. Verify source is already set to HA
+rg 'vault_mode\\s+=\\s+"ha"' stacks/vault-consul/production/env.hcl
 
-git add stacks/vault-consul/production/env.hcl
-git diff --cached stacks/vault-consul/production/env.hcl   # verify diff
-# git commit + push  → CI applies via deploy.yml
+# Review the source diff, then publish it through the normal repo flow.
+git diff
 
 # OR apply locally if you want manual control:
 cd stacks/vault-consul/production
@@ -54,6 +52,13 @@ terragrunt run --target='vault'        apply     # apply HA
 ```
 
 ## Initialize Raft (one-time)
+
+The `vault` unit initializes HA Vault during apply and writes these SSM SecureString parameters:
+
+- `/terragrunt-infra/vault/root-token`
+- `/terragrunt-infra/vault/recovery-key-0` through `/terragrunt-infra/vault/recovery-key-4`
+
+Use the commands below only if you need to initialize manually.
 
 ```bash
 kubectl wait --for=condition=Ready pod/vault-0 -n vault --timeout=300s

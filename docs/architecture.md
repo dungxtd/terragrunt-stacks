@@ -31,7 +31,7 @@
                 │                │
   Layer 3 ─── kms ──┐           │ ─────────────────── Security
                      │           │
-  Layer 4 ─── vault ─┘    ─── rds ────────────────── Data + Secrets
+  Layer 4 ─── vault-irsa* ─ vault ─── rds ─────────── Data + Secrets
                 │                │
   Layer 5 ─── certs      ─── vault-config ─────────── Vault PKI + Config
                 │
@@ -39,6 +39,8 @@
                 │
   Layer 7 ─── github-runner ───────────────────────── CI/CD (AWS only)
 ```
+
+`vault-irsa` is AWS HA only; MiniStack dev mode skips it.
 
 ### GitOps Waves (ArgoCD ApplicationSet)
 

@@ -25,10 +25,10 @@ variable "dev_root_token" {
   sensitive   = true
 }
 
-variable "tags" {
-  description = "Common tags"
-  type        = map(string)
-  default     = {}
+variable "vault_irsa_role_arn" {
+  description = "IAM role ARN annotated on Vault service account in HA mode"
+  type        = string
+  default     = ""
 }
 
 variable "ssm_endpoint" {

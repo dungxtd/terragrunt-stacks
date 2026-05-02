@@ -368,15 +368,14 @@ sequenceDiagram
   participant Apps as Consumers
 
   Op->>V: backup all secrets (vault kv get -format=json)
-  Op->>Op: edit env.hcl: vault_mode = ha
+  Op->>Op: verify env.hcl: vault_mode = ha
   Op->>TG: terragrunt destroy units/vault-config + vault
   TG->>V: tear down dev pod
   Op->>TG: terragrunt apply units/vault
   TG->>V2: 3 pods boot, Raft elects leader
   V2->>V2: KMS auto-unseal (no manual keys)
-  Op->>V2: vault operator init -recovery-shares=5
-  V2-->>Op: root token + 5 recovery keys
-  Op->>SSM: stash root + recovery keys (encrypted)
+  TG->>V2: vault operator init -recovery-shares=5 -recovery-threshold=3
+  TG->>SSM: stash root + recovery keys (encrypted)
   Op->>TG: apply units/vault-config (re-create roles/policies)
   Op->>V2: vault kv put (restore secrets from backup)
   Op->>Apps: kubectl rollout restart all consumers

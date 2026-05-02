@@ -1,6 +1,6 @@
 # Unit targets — Usage: make <apply|destroy|plan>-<unit>
 
-UNIT_LIST := vpc eks kms rds vault vault-config certs argocd linkerd aws-alb github-runner
+UNIT_LIST := vpc eks kms rds vault-irsa vault vault-config certs argocd linkerd aws-alb github-runner
 
 define unit-rule
 .PHONY: apply-$(1) destroy-$(1) plan-$(1)

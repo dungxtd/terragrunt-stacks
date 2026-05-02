@@ -1,7 +1,7 @@
-# ADR 0002: Vault dev mode for free tier
+# ADR 0002: Vault production mode
 
 Date: 2026-05-01
-Status: Accepted (temporary)
+Status: Superseded
 
 ## Context
 
@@ -9,21 +9,23 @@ Real Vault HA needs raft storage (PVC × 3), KMS auto-unseal, init/unseal ceremo
 
 ## Decision
 
-Set `vault_mode = "dev"` in `stacks/vault-consul/production/env.hcl`. Single replica, in-memory storage, root token = `"root"`.
+Production now sets `vault_mode = "ha"` in `stacks/vault-consul/production/env.hcl`.
+
+MiniStack remains on `vault_mode = "dev"` for local bootstrap speed.
 
 ## Consequences
 
-- ✅ Zero ops, instant `make ms-bootstrap`
-- 🔴 Tokens, secrets, leases lost on pod restart
-- 🔴 `root` token is hardcoded — no production-grade auth
-- 🔴 Not suitable for storing real secrets
+- Production Vault uses 3 replicas, integrated Raft storage, PVCs, and AWS KMS auto-unseal.
+- Vault pods use IRSA for KMS access.
+- Terraform initializes Vault once and stores the root token plus recovery keys in SSM SecureString parameters.
+- Production no longer relies on the hardcoded `root` dev token.
 
 ## Migration to HA
 
-Switch `vault_mode = "ha"` in env.hcl. Already wired in `units/vault/terragrunt.hcl` — Helm values automatically switch to raft + KMS auto-unseal block. Requires:
+`units/vault/terragrunt.hcl` switches Helm values to Raft + KMS auto-unseal when `vault_mode = "ha"`, while `units/vault-irsa` owns the AWS IAM role/policy used by the Vault service account. Requires:
 - KMS key (already provisioned by `units/kms`)
 - 10Gi PVC × 3 storage class
-- ACL bootstrap (`vault operator init`)
-- Storing unseal keys in SSM (already wired via `vault_token_cmd`)
+- ACL bootstrap (`vault operator init`, run by Terraform for first init)
+- Root token and recovery keys in SSM
 
-Run `make stack-vault-production apply` after the switch.
+Run `make stack-vault-production apply` after backing up any dev-mode secrets.

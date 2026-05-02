@@ -22,13 +22,24 @@ dependency "kms" {
   }
 }
 
+dependency "vault_irsa" {
+  config_path = "../vault-irsa"
+  enabled     = local.env_cfg.locals.vault_mode == "ha"
+
+  mock_outputs = {
+    vault_irsa_role_arn = "arn:aws:iam::000000000000:role/mock-vault"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+  mock_outputs_merge_strategy_with_state  = "shallow"
+}
+
 inputs = {
-  region          = local.region
-  vault_mode      = local.env_cfg.locals.vault_mode
-  dev_root_token  = local.env_cfg.locals.dev_root_token
-  tags            = local.common.locals.common_tags
-  ssm_endpoint    = local.env_cfg.locals.ssm_endpoint
-  kubeconfig_path = local.env_cfg.locals.kubeconfig_path
+  region              = local.region
+  vault_mode          = local.env_cfg.locals.vault_mode
+  dev_root_token      = local.env_cfg.locals.dev_root_token
+  vault_irsa_role_arn = local.env_cfg.locals.vault_mode == "ha" ? dependency.vault_irsa.outputs.vault_irsa_role_arn : ""
+  ssm_endpoint        = local.env_cfg.locals.ssm_endpoint
+  kubeconfig_path     = local.env_cfg.locals.kubeconfig_path
 
   # Build Helm values at Terragrunt layer — module receives only the final YAML.
   # Keyed by vault_mode ("dev" / "ha") from the env config.
@@ -50,8 +61,9 @@ inputs = {
       server = {
         enabled = true
         ha = {
-          enabled  = true
-          replicas = 3
+          enabled   = true
+          replicas  = 3
+          setNodeId = true
           raft = {
             enabled = true
             config  = <<-EOF
@@ -63,6 +75,15 @@ inputs = {
               }
               storage "raft" {
                 path = "/vault/data"
+                retry_join {
+                  leader_api_addr = "http://vault-0.vault-internal:8200"
+                }
+                retry_join {
+                  leader_api_addr = "http://vault-1.vault-internal:8200"
+                }
+                retry_join {
+                  leader_api_addr = "http://vault-2.vault-internal:8200"
+                }
               }
               seal "awskms" {
                 region     = "${local.region}"

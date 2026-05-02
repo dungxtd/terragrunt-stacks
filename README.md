@@ -24,7 +24,7 @@ source scripts/load_env.sh
 | 1 | vpc | Network |
 | 2 | eks | Compute (k3s / EKS) |
 | 3 | kms | Vault auto-unseal |
-| 4 | vault, rds | Secrets + Database |
+| 4 | vault-irsa (AWS HA only), vault, rds | Secrets + Database |
 | 5 | certs, vault-config | PKI + Vault config |
 | 6 | linkerd, argocd | Service mesh + GitOps |
 | 7 | github-runner | CI/CD (AWS only) |
@@ -68,7 +68,7 @@ docs/              architecture.md, adr/, runbooks/, archive/
 
 - **[Platform Guide](docs/PLATFORM_GUIDE.md)** — components, end-to-end flows, all use cases (start here)
 - [Architecture](docs/architecture.md) — network topology, vault flow, env comparison
-- [ADRs](docs/adr/) — decisions: mesh choice, vault dev mode, ALB grouping
+- [ADRs](docs/adr/) — decisions: mesh choice, Vault production mode, ALB grouping
 - [Runbooks](docs/runbooks/) — fix recipes: canary stuck, consul stale services, vault HA migration
 - [GitOps](gitops/README.md) — App-of-Apps layout, sync waves, payments-app chart
 
