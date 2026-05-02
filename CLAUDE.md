@@ -22,7 +22,7 @@ gitops/
   apps/               — ArgoCD App-of-Apps: root.yaml, appset-platform.yaml, payments-app.yaml, platform-ui.yaml
   charts/             — in-house Helm charts (_lib library + payments-app)
   values/<app>/<env>.yaml — per-app per-env Helm values
-  platform-ui/        — raw ALB Ingress manifests
+  platform/platform-ui/ — raw ALB Ingress manifests
 ministack/            — local dev: docker-compose.yml + entrypoint.sh
 scripts/              — load_env.sh
 makefiles/            — modular Makefile parts (stacks, units, helm, k8s, vault, ministack, util)

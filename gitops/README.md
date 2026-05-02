@@ -10,7 +10,7 @@ gitops/
 │   ├── root.yaml                      ← App-of-Apps; watches gitops/apps/ recursively
 │   ├── appset-platform.yaml           ← upstream Helm charts (consul, datadog, flagger)
 │   ├── payments-app.yaml              ← in-house chart (gitops/charts/payments-app)
-│   └── platform-ui.yaml               ← raw Ingress manifests (gitops/platform-ui/)
+│   └── platform-ui.yaml               ← raw Ingress manifests (gitops/platform/platform-ui/)
 ├── charts/                            ← in-house Helm charts
 │   ├── _lib/                          ← library chart: lib.workload, lib.mesh, lib.vault
 │   └── payments-app/                  ← single services.yaml loops Values.services
@@ -19,7 +19,8 @@ gitops/
 │   ├── datadog/production.yaml
 │   ├── flagger/production.yaml
 │   └── payments-app/production.yaml
-└── platform-ui/                       ← raw kubectl ingress manifests (host-routed ALBs)
+└── platform/
+    └── platform-ui/                   ← raw kubectl ingress manifests (host-routed ALBs)
     └── ingresses.yaml
 ```
 
@@ -43,7 +44,7 @@ Set via `argocd.argoproj.io/sync-wave` annotation in each app file:
 | 2 | datadog | upstream `datadog/datadog` |
 | 3 | flagger | upstream `flagger/flagger` |
 | 4 | payments-app | local `gitops/charts/payments-app` |
-| 5 | platform-ui | raw manifests `gitops/platform-ui/` |
+| 5 | platform-ui | raw manifests `gitops/platform/platform-ui/` |
 
 ## Values
 

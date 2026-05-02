@@ -1,4 +1,4 @@
-meshProvider: linkerd
+meshProvider: gatewayapi:v1beta1
 metricsServer: http://prometheus.linkerd-viz:9090
 
 podAnnotations:

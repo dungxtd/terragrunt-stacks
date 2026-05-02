@@ -1,20 +1,19 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: platform-ui
+  name: linkerd-viz-policy
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   project: platform
   source:
     repoURL: https://github.com/dungxtd/terragrunt-stacks
     targetRevision: main
-    path: gitops/platform/platform-ui
-    directory:
-      recurse: true
+    path: gitops/platform/linkerd-viz-policy
   destination:
     server: https://kubernetes.default.svc
+    namespace: linkerd-viz
   syncPolicy:
     automated:
       prune: true

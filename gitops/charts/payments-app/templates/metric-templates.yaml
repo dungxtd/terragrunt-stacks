@@ -1,0 +1,56 @@
+{{- if .Values.canary.enabled }}
+apiVersion: flagger.app/v1beta1
+kind: MetricTemplate
+metadata:
+  name: linkerd-success-rate
+  namespace: {{ .Values.namespace }}
+spec:
+  provider:
+    type: prometheus
+    address: {{ .Values.canary.metricsServer | quote }}
+  query: |
+    sum(
+      rate(
+        response_total{
+          namespace="{{`{{ namespace }}`}}",
+          deployment=~"{{`{{ target }}`}}",
+          classification!="failure",
+          direction="inbound"
+        }[{{`{{ interval }}`}}]
+      )
+    )
+    /
+    sum(
+      rate(
+        response_total{
+          namespace="{{`{{ namespace }}`}}",
+          deployment=~"{{`{{ target }}`}}",
+          direction="inbound"
+        }[{{`{{ interval }}`}}]
+      )
+    )
+    * 100
+---
+apiVersion: flagger.app/v1beta1
+kind: MetricTemplate
+metadata:
+  name: linkerd-request-duration
+  namespace: {{ .Values.namespace }}
+spec:
+  provider:
+    type: prometheus
+    address: {{ .Values.canary.metricsServer | quote }}
+  query: |
+    histogram_quantile(
+      0.99,
+      sum(
+        rate(
+          response_latency_ms_bucket{
+            namespace="{{`{{ namespace }}`}}",
+            deployment=~"{{`{{ target }}`}}",
+            direction="inbound"
+          }[{{`{{ interval }}`}}]
+        )
+      ) by (le)
+    )
+{{- end }}

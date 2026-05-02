@@ -1,0 +1,4 @@
+podAnnotations:
+  linkerd.io/inject: enabled
+  consul.hashicorp.com/connect-inject: "false"
+

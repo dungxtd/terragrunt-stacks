@@ -4,7 +4,8 @@ mesh: linkerd
 secrets: vault
 
 canary:
-  enabled: false
+  enabled: true
+  metricsServer: http://prometheus.linkerd-viz:9090
 
 vault:
   address: "http://vault.vault.svc.cluster.local:8200"

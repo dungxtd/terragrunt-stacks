@@ -485,7 +485,7 @@ flowchart TB
   X[Add new...] --> Y{What?}
   Y -->|microservice| MS[gitops/values/payments-app/production.yaml<br/>services: map]
   Y -->|secret| SEC[gitops/values/secret-stores/production.yaml<br/>externalSecrets: map<br/>+ vault kv put]
-  Y -->|ingress| ING[gitops/platform-ui/ingresses.yaml]
+  Y -->|ingress| ING[gitops/platform/platform-ui/ingresses.yaml]
   Y -->|upstream Helm app<br/>e.g. prometheus| APP[2 files:<br/>gitops/apps/appset-platform.yaml elements list<br/>gitops/values/prometheus/production.yaml]
   Y -->|in-house Helm chart| CHART[gitops/charts/<name>/<br/>+ gitops/apps/<name>.yaml<br/>+ gitops/values/<name>/production.yaml]
   Y -->|Vault role/policy| VLT[units/vault-config/main.tf]

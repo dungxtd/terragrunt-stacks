@@ -28,6 +28,13 @@ spec:
             namespace: flagger-system
             wave: "3"
 
+          - app: loadtester
+            repoURL: https://flagger.app
+            chart: loadtester
+            targetRevision: "0.37.0"
+            namespace: flagger-system
+            wave: "3"
+
   template:
     metadata:
       name: "{{app}}"

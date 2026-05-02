@@ -9,27 +9,31 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: payments-app
-  {{- if eq .Values.mesh "linkerd" }}
-  provider: linkerd
-  {{- end }}
-  {{- if eq .Values.mesh "consul" }}
-  provider: consul
-  {{- end }}
   progressDeadlineSeconds: 60
   service:
     port: 8080
     targetPort: 8080
+    gatewayRefs:
+      - name: payments-app
+        namespace: {{ .Values.namespace }}
+        group: core
+        kind: Service
+        port: 8080
   analysis:
     interval: 30s
     threshold: 5
     maxWeight: 50
     stepWeight: 10
     metrics:
-      - name: request-success-rate
+      - name: linkerd-success-rate
+        templateRef:
+          name: linkerd-success-rate
         thresholdRange:
           min: 99
         interval: 1m
-      - name: request-duration
+      - name: linkerd-request-duration
+        templateRef:
+          name: linkerd-request-duration
         thresholdRange:
           max: 500
         interval: 1m

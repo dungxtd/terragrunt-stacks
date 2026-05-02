@@ -57,7 +57,7 @@ make tg-clean              # Clear cache
 ```
 terraform/         (units/<name>)        — TF modules, one per resource group
 stacks/            vault-consul/{prod,ms}/ — terragrunt stack definitions per env
-gitops/            apps/, charts/, values/, platform-ui/  — ArgoCD-managed runtime
+gitops/            apps/, charts/, values/, platform/     — ArgoCD-managed runtime
 ministack/         docker-compose.yml + entrypoint.sh     — local dev stack
 scripts/           load_env.sh                              — shell helpers
 makefiles/         stacks.mk units.mk helm.mk vault.mk ... — modular Makefile parts
