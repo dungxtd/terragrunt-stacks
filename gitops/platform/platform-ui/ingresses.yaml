@@ -1,130 +1,18 @@
-# Shared ALB (group.name=platform):
-#   /argocd/*    → argocd-server   (subpath via configs.params)
-#   /*           → frontend        (catch-all, group.order=99)
+# Shared ALB (group.name=platform) — payments-app only.
+# Other UIs (argocd, consul, vault, linkerd-viz) accessible via kubectl port-forward.
 #
-# Dedicated ALBs (no group, path=/, ~$16/mo each — UI subpath broken):
-#   consul-ui    → consul-ui       (UI hardcodes API at /v1/)
-#   vault-ui     → vault           (Vault has no subpath support)
-#   linkerd-viz  → web             (viz hardcodes asset paths)
-#
-# Get ALB hostnames:
-#   kubectl get ingress -A -o wide
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: argocd-ui
-  namespace: argocd
-  labels:
-    alb.group: platform
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/group.name: platform
-    alb.ingress.kubernetes.io/group.order: "10"
-    alb.ingress.kubernetes.io/healthcheck-path: /argocd/healthz
-spec:
-  ingressClassName: alb
-  rules:
-    - http:
-        paths:
-          - path: /argocd
-            pathType: Prefix
-            backend:
-              service:
-                name: argocd-server
-                port:
-                  number: 80
----
-# Dedicated ALB for Consul. Subpath broken (UI hardcodes API at /v1/, content_path
-# only fixes assets) — separate ALB at root path is the only way to expose UI.
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: consul-ui
-  namespace: consul
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/backend-protocol: HTTPS
-    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
-    alb.ingress.kubernetes.io/healthcheck-path: /v1/status/leader
-spec:
-  ingressClassName: alb
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: consul-ui
-                port:
-                  number: 443
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: vault-ui
-  namespace: vault
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/healthcheck-path: /v1/sys/health
-    alb.ingress.kubernetes.io/success-codes: 200,429,472,473
-spec:
-  ingressClassName: alb
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: vault
-                port:
-                  number: 8200
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: linkerd-viz
-  namespace: linkerd-viz
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/healthcheck-path: /
-spec:
-  ingressClassName: alb
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: web
-                port:
-                  number: 8084
+# Get ALB hostname:
+#   kubectl get ingress payments-app -n payments-app -o wide
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: payments-app
   namespace: payments-app
-  labels:
-    alb.group: platform
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/group.name: platform
-    alb.ingress.kubernetes.io/group.order: "99"
-    alb.ingress.kubernetes.io/healthcheck-path: /
 spec:
   ingressClassName: alb
   rules:
