@@ -8,7 +8,7 @@ AWS infra for payments-app. Runs on MiniStack (local) or real AWS. Terragrunt or
 root.hcl              — root config: versions generate, delegates provider/backend to env.hcl
 common.hcl            — shared locals: project="terragrunt-infra", region="ap-southeast-1"
 _common/
-  vault_provider.hcl  — shared Vault token fetch (SSM) + port-forward hook + vault/k8s providers
+  vault_provider.hcl  — shared vault dependency + root token provider + port-forward hook
   k8s_providers.hcl   — shared EKS dependency + helm/kubernetes providers
 stacks/vault-consul/
   production/
