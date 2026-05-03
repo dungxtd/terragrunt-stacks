@@ -28,7 +28,6 @@ spec:
     - { server: https://kubernetes.default.svc, namespace: linkerd-viz }
     - { server: https://kubernetes.default.svc, namespace: external-secrets }
     - { server: https://kubernetes.default.svc, namespace: gateway-system }
-    - { server: https://kubernetes.default.svc, namespace: "*" }
 
   clusterResourceWhitelist:
     - { group: "",                              kind: Namespace }
