@@ -52,8 +52,6 @@ resource "helm_release" "argocd" {
     configs = {
       params = {
         "server.insecure" = true
-        "server.basehref" = "/argocd"
-        "server.rootpath" = "/argocd"
       }
     }
   })]
