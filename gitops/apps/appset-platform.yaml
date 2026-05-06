@@ -7,11 +7,11 @@ spec:
   generators:
     - list:
         elements:
-          - app: datadog
-            repoURL: https://helm.datadoghq.com
-            chart: datadog
-            targetRevision: "3.205.0" # appVersion 7.x
-            namespace: datadog
+          - app: kube-prometheus-stack
+            repoURL: https://prometheus-community.github.io/helm-charts
+            chart: kube-prometheus-stack
+            targetRevision: "65.2.0"
+            namespace: monitoring
             wave: "2"
 
           - app: flagger
@@ -57,22 +57,6 @@ spec:
           jsonPointers:
             - /spec/template/metadata/annotations
             - /spec/template/spec
-        - group: ""
-          kind: Secret
-          name: datadog-cluster-agent
-          jsonPointers:
-            - /data
-        - group: ""
-          kind: ConfigMap
-          name: datadog-kpi-telemetry-configmap
-          jsonPointers:
-            - /data
-        - group: apps
-          kind: Deployment
-          name: datadog-cluster-agent
-          jsonPointers:
-            - /spec/template/metadata/annotations
-            - /spec/template/spec/containers
       syncPolicy:
         automated:
           prune: true

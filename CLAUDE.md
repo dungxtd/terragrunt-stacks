@@ -49,10 +49,10 @@ docs/                 — architecture.md, adr/, runbooks/, archive/
 
 ## GitOps Waves (ArgoCD — App-of-Apps in gitops/apps/, NOT Terraform)
 
-Wave 0: external-secrets → Wave 1: secret-stores → Wave 2: datadog → Wave 3: flagger/loadtester → Wave 4: payments-app
+Wave 0: external-secrets → Wave 1: secret-stores → Wave 2: kube-prometheus-stack → Wave 3: flagger/loadtester → Wave 4: payments-app
 
 Pinned chart versions live in `gitops/apps/appset-platform.yaml`:
-datadog=3.205.0, flagger=1.43.0, loadtester=0.37.0
+kube-prometheus-stack=65.2.0, flagger=1.43.0, loadtester=0.37.0
 
 ## Key Commands
 

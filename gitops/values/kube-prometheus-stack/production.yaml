@@ -1,0 +1,57 @@
+# Minimal kube-prometheus-stack for free-tier EKS (4× t3.small).
+# Replaces Datadog: scrapes pod/node/cluster metrics, ships dashboards via Grafana.
+
+# Drop CRDs ownership transfer (chart manages CRDs already)
+crds:
+  enabled: true
+
+# AlertManager: disabled — no on-call yet
+alertmanager:
+  enabled: false
+
+# Prometheus: shrink to fit free tier
+prometheus:
+  prometheusSpec:
+    retention: 24h           # 1 day = enough for demo, low EBS use
+    retentionSize: "5GB"
+    resources:
+      requests: { cpu: 100m, memory: 384Mi }
+      limits:   { cpu: 500m, memory: 768Mi }
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+# Grafana: enable, NodePort (port-forward for access)
+grafana:
+  enabled: true
+  adminPassword: admin       # demo only — rotate via Vault in prod
+  service:
+    type: ClusterIP
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 200m, memory: 256Mi }
+  persistence:
+    enabled: false           # ephemeral, no PVC
+
+# Node exporter: per-node metrics (CPU/RAM/disk)
+prometheus-node-exporter:
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits:   { cpu: 50m, memory: 64Mi }
+
+# kube-state-metrics: cluster object metrics
+kube-state-metrics:
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits:   { cpu: 50m, memory: 64Mi }
+
+# Linkerd already provides mesh metrics (linkerd-viz); avoid duplicates
+prometheusOperator:
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits:   { cpu: 200m, memory: 192Mi }
