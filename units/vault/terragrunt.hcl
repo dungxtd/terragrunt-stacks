@@ -42,3 +42,16 @@ inputs = {
   ssm_endpoint        = local.env_cfg.locals.ssm_endpoint
   kubeconfig_path     = local.env_cfg.locals.kubeconfig_path
 }
+
+# After helm_release + aws_ssm_parameter resources apply, run init script.
+# Script is idempotent (skips if Vault already initialized), so safe on every apply.
+terraform {
+  after_hook "vault_init" {
+    commands = ["apply"]
+    execute = [
+      "bash", "-c",
+      "VAULT_MODE='${local.env_cfg.locals.vault_mode}' AWS_REGION='${local.region}' KUBECONFIG='${local.env_cfg.locals.kubeconfig_path}' SSM_ENDPOINT='${local.env_cfg.locals.ssm_endpoint}' DEV_ROOT_TOKEN='${local.env_cfg.locals.dev_root_token}' bash ${get_repo_root()}/scripts/vault-init.sh"
+    ]
+    run_on_error = false
+  }
+}

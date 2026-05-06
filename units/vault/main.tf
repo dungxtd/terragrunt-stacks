@@ -108,7 +108,7 @@ data "aws_ssm_parameter" "vault_root_token" {
   with_decryption = true
 
   depends_on = [
-    terraform_data.vault_init_dev,
-    terraform_data.vault_init_ha,
+    aws_ssm_parameter.vault_root_token_dev,
+    aws_ssm_parameter.vault_root_token_ha,
   ]
 }
