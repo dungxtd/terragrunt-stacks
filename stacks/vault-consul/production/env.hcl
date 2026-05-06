@@ -86,11 +86,11 @@ locals {
   # pods of <service_namespace>/<service_name>:<service_port> to the TG.
   alb = {
     service_namespace = "payments-app"
-    service_name      = "frontend"
-    service_port      = 80
+    service_name      = "payments-app"
+    service_port      = 8080
     listen_port       = 80
     scheme            = "internet-facing" # "internal" for private
-    health_check_path = "/"
+    health_check_path = "/actuator/health"
     certificate_arn   = "" # set to enable HTTPS:443 listener
   }
 
