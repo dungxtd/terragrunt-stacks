@@ -6,7 +6,7 @@ locals {
 
 resource "aws_kms_key" "vault_unseal" {
   description             = "Vault auto-unseal key"
-  deletion_window_in_days = 10
+  deletion_window_in_days = 7
   enable_key_rotation     = true
   policy                  = data.aws_iam_policy_document.vault_unseal.json
   tags                    = merge(var.tags, { Purpose = "vault-unseal" })
@@ -50,7 +50,7 @@ resource "aws_kms_alias" "vault_unseal" {
 
 resource "aws_kms_key" "sops" {
   description             = "SOPS secrets encryption key"
-  deletion_window_in_days = 10
+  deletion_window_in_days = 7
   enable_key_rotation     = true
   policy                  = data.aws_iam_policy_document.sops.json
   tags                    = merge(var.tags, { Purpose = "sops-secrets" })
@@ -95,7 +95,7 @@ resource "aws_kms_alias" "sops" {
 
 resource "aws_kms_key" "tf_state" {
   description             = "Terraform state encryption key"
-  deletion_window_in_days = 10
+  deletion_window_in_days = 7
   enable_key_rotation     = true
   policy                  = data.aws_iam_policy_document.tf_state.json
   tags                    = merge(var.tags, { Purpose = "tf-state" })

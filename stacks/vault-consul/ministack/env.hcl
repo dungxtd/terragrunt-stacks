@@ -27,6 +27,7 @@ locals {
           Project     = "${local._project}"
           Environment = "${local.name}"
           ManagedBy   = "terragrunt"
+          Stack       = "vault-consul"
         }
       }
 

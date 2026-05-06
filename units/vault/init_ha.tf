@@ -80,3 +80,33 @@ resource "terraform_data" "vault_init_ha" {
     helm_release.vault.version,
   ]
 }
+
+# Destroy-time cleanup: SSM params written imperatively above are out-of-band.
+# This resource deletes them on `terraform destroy` so they don't accumulate.
+resource "terraform_data" "vault_ssm_cleanup_ha" {
+  count = var.vault_mode == "ha" ? 1 : 0
+
+  input = {
+    region       = var.region
+    ssm_endpoint = var.ssm_endpoint
+    token_name   = local.ssm_token_name
+  }
+
+  provisioner "local-exec" {
+    when        = destroy
+    interpreter = ["bash", "-c"]
+    command     = <<-EOF
+      ENDPOINT=""
+      [ -n "${self.input.ssm_endpoint}" ] && ENDPOINT="--endpoint-url ${self.input.ssm_endpoint}"
+      AWS_DEFAULT_REGION="${self.input.region}" \
+        aws ssm delete-parameters $ENDPOINT \
+        --names "${self.input.token_name}" \
+                "/terragrunt-infra/vault/recovery-key-0" \
+                "/terragrunt-infra/vault/recovery-key-1" \
+                "/terragrunt-infra/vault/recovery-key-2" \
+                "/terragrunt-infra/vault/recovery-key-3" \
+                "/terragrunt-infra/vault/recovery-key-4" \
+        2>/dev/null || true
+    EOF
+  }
+}

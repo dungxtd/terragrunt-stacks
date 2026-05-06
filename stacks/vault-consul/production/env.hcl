@@ -15,6 +15,7 @@ locals {
           Project     = "${local._project}"
           Environment = "${local.name}"
           ManagedBy   = "terragrunt"
+          Stack       = "vault-consul"
         }
       }
     }
@@ -79,6 +80,19 @@ locals {
 
   # ArgoCD — NodePort to skip $16/mo NLB. Use kubectl port-forward to access.
   argocd_service_type = "NodePort"
+
+  # ── ALB (TF-managed) ─────────────────────────────────────────
+  # The ALB lives in TF state. K8s TargetGroupBinding (in alb unit) registers
+  # pods of <service_namespace>/<service_name>:<service_port> to the TG.
+  alb = {
+    service_namespace = "payments-app"
+    service_name      = "frontend"
+    service_port      = 80
+    listen_port       = 80
+    scheme            = "internet-facing" # "internal" for private
+    health_check_path = "/"
+    certificate_arn   = "" # set to enable HTTPS:443 listener
+  }
 
   # DB: no overrides — use real RDS outputs
   rds_endpoint_override = ""

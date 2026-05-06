@@ -70,6 +70,15 @@ unit "argocd" {
   depends_on = [unit.aws_alb]
 }
 
+# TF-managed ALB + TargetGroup + TargetGroupBinding. ALB stays in TF state
+# so destroy is leak-free. Controller (aws_alb unit) only registers pods to
+# this TG via TGB CR — it never creates the ALB itself.
+unit "alb" {
+  source     = "../../../units/alb"
+  path       = "alb"
+  depends_on = [unit.aws_alb]
+}
+
 # ── Layer 7: CI/CD Runner ────────────────────────────────────────
 
 unit "github_runner" {

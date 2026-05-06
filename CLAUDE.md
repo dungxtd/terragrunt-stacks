@@ -19,10 +19,10 @@ stacks/vault-consul/
     terragrunt.stack.hcl   — stack definition (6 layers, no github-runner)
 units/<name>/         — individual Terraform modules (main.tf, variables.tf, outputs.tf, terragrunt.hcl)
 gitops/
-  apps/               — ArgoCD App-of-Apps: root.yaml, appset-platform.yaml, payments-app.yaml, platform-ui.yaml
+  apps/               — ArgoCD App-of-Apps: root.yaml, appset-platform.yaml, payments-app.yaml
   charts/             — in-house Helm charts (_lib library + payments-app)
   values/<app>/<env>.yaml — per-app per-env Helm values
-  platform/platform-ui/ — raw ALB Ingress manifests
+  platform/linkerd-viz-policy/ — raw k8s manifests (Linkerd-Viz authz policy)
 ministack/            — local dev: docker-compose.yml + entrypoint.sh
 scripts/              — load_env.sh
 makefiles/            — modular Makefile parts (stacks, units, helm, k8s, vault, ministack, util)
@@ -43,15 +43,16 @@ docs/                 — architecture.md, adr/, runbooks/, archive/
 | vault-config | 5 | Vault secrets engines, PKI, DB dynamic creds |
 | linkerd | 6 | Service mesh |
 | argocd | 6 | GitOps controller |
-| aws-alb | 6 | AWS ALB Ingress controller (IRSA) |
+| aws-alb | 6 | AWS ALB Ingress controller (IRSA + Helm) |
+| alb | 6 | TF-managed ALB + TargetGroup + TargetGroupBinding (frontend) |
 | github-runner | 7 | ARC self-hosted runner (AWS only) |
 
 ## GitOps Waves (ArgoCD — App-of-Apps in gitops/apps/, NOT Terraform)
 
-Wave 1: consul → Wave 2: datadog → Wave 3: flagger → Wave 4: payments-app → Wave 5: platform-ui
+Wave 0: external-secrets → Wave 1: secret-stores → Wave 2: datadog → Wave 3: flagger/loadtester → Wave 4: payments-app
 
 Pinned chart versions live in `gitops/apps/appset-platform.yaml`:
-consul=1.9.7, datadog=3.205.0, flagger=1.43.0
+datadog=3.205.0, flagger=1.43.0, loadtester=0.37.0
 
 ## Key Commands
 

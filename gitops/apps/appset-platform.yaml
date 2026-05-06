@@ -7,13 +7,6 @@ spec:
   generators:
     - list:
         elements:
-          - app: consul
-            repoURL: https://helm.releases.hashicorp.com
-            chart: consul
-            targetRevision: "1.9.7"   # appVersion 1.22.7 — pin; bump via Renovate
-            namespace: consul
-            wave: "1"
-
           - app: datadog
             repoURL: https://helm.datadoghq.com
             chart: datadog
@@ -39,6 +32,8 @@ spec:
     metadata:
       name: "{{app}}"
       namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
       annotations:
         argocd.argoproj.io/sync-wave: "{{wave}}"
     spec:
@@ -78,13 +73,6 @@ spec:
           jsonPointers:
             - /spec/template/metadata/annotations
             - /spec/template/spec/containers
-        - group: apps
-          kind: StatefulSet
-          name: consul-server
-          jsonPointers:
-            - /spec/template/metadata/annotations
-            - /spec/template/spec/containers
-            - /spec/volumeClaimTemplates
       syncPolicy:
         automated:
           prune: true

@@ -35,3 +35,27 @@ resource "terraform_data" "vault_init_dev" {
     helm_release.vault.version,
   ]
 }
+
+# Destroy-time cleanup: SSM root-token written imperatively above is out-of-band.
+resource "terraform_data" "vault_ssm_cleanup_dev" {
+  count = var.vault_mode == "dev" ? 1 : 0
+
+  input = {
+    region       = var.region
+    ssm_endpoint = var.ssm_endpoint
+    token_name   = local.ssm_token_name
+  }
+
+  provisioner "local-exec" {
+    when        = destroy
+    interpreter = ["bash", "-c"]
+    command     = <<-EOF
+      ENDPOINT=""
+      [ -n "${self.input.ssm_endpoint}" ] && ENDPOINT="--endpoint-url ${self.input.ssm_endpoint}"
+      AWS_DEFAULT_REGION="${self.input.region}" \
+        aws ssm delete-parameter $ENDPOINT \
+        --name "${self.input.token_name}" \
+        2>/dev/null || true
+    EOF
+  }
+}

@@ -15,6 +15,9 @@ module "eks" {
   enabled_log_types                      = var.cluster_enabled_log_types
   cloudwatch_log_group_retention_in_days = 365
 
+  # Min deletion window (default 30) — speeds cleanup, avoids KMS pile-up
+  kms_key_deletion_window_in_days = 7
+
   enable_cluster_creator_admin_permissions = var.enable_cluster_creator_admin_permissions
 
   create_security_group      = var.create_cluster_security_group

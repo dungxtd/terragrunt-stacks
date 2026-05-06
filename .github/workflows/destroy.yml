@@ -23,6 +23,8 @@ env:
   STATE_BUCKET: tf-state-terragrunt-stacks
   STATE_PREFIX: stacks/vault-consul/production
   STATE_UNITS: vpc eks kms rds vault-irsa vault certs vault-config linkerd argocd aws-alb github-runner
+  CLUSTER_NAME: terragrunt-infra-eks
+  PROJECT_TAG: terragrunt-infra
 
 jobs:
   destroy:
@@ -55,34 +57,102 @@ jobs:
       - name: Setup kubectl
         uses: azure/setup-kubectl@v5
 
+      - name: Setup ArgoCD CLI
+        run: |
+          curl -sL https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 \
+            -o /usr/local/bin/argocd
+          chmod +x /usr/local/bin/argocd
+
       # vault provider's before_hook port-forwards Vault via kubectl. certs and
       # vault-config destroy first (depend on Vault) — kubeconfig must exist
       # before Terragrunt runs. Tolerate missing cluster (already destroyed).
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --name terragrunt-infra-eks --region ${{ env.AWS_REGION }} || \
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} || \
             echo "kubeconfig not generated (cluster may already be destroyed)"
 
-      # Drain k8s app-layer resources so AWS controllers clean up ALBs/PVCs
-      # before TF destroys VPC. Skip if cluster gone.
-      - name: Drain k8s resources
+      # Phase 1: ArgoCD cascade — finalizer-driven graceful teardown.
+      # Deletes root app → cascades to ApplicationSet + child apps (Ingress,
+      # PVC, Service LB) in reverse sync-wave order. AWS controllers reconcile
+      # ALB / EBS / NLB cleanup before VPC dies.
+      - name: ArgoCD cascade delete
         run: |
-          if ! kubectl get ns >/dev/null 2>&1; then
-            echo "cluster unreachable, skip drain"
+          if ! kubectl get ns argocd >/dev/null 2>&1; then
+            echo "argocd namespace gone, skip"; exit 0
+          fi
+
+          kubectl -n argocd port-forward svc/argocd-server 8080:443 >/dev/null 2>&1 &
+          PF=$!
+          trap "kill $PF 2>/dev/null || true" EXIT
+          sleep 5
+
+          PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret \
+            -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
+          if [ -z "$PASS" ]; then
+            echo "argocd admin secret missing, fallback to kubectl delete"
+            kubectl -n argocd delete applications.argoproj.io --all --cascade=foreground --timeout=600s || true
+            kubectl -n argocd delete applicationsets.argoproj.io --all --timeout=120s || true
             exit 0
           fi
-          kubectl delete ingress --all -A --timeout=60s || true
+
+          argocd login localhost:8080 --username admin --password "$PASS" --insecure --plaintext=false
+
+          # Delete root app → cascades to all children (resources-finalizer in CRs)
+          argocd app delete root --cascade --propagation-policy=foreground -y || true
+
+          # Wait for all apps to drain
+          for i in $(seq 1 90); do
+            COUNT=$(argocd app list -o name 2>/dev/null | grep -c . || echo 0)
+            [ "$COUNT" -eq 0 ] && { echo "all apps drained"; break; }
+            echo "wait apps drain ($i/90): $COUNT remain"
+            sleep 10
+          done
+
+          # Strip stuck finalizers as last resort
+          for app in $(kubectl -n argocd get applications.argoproj.io -o name 2>/dev/null); do
+            kubectl -n argocd patch "$app" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
+          done
+          kubectl -n argocd delete applicationsets.argoproj.io --all --timeout=60s || true
+
+      # Phase 2: drain residual k8s resources not owned by ArgoCD
+      - name: Drain residual k8s resources
+        run: |
+          if ! kubectl get ns >/dev/null 2>&1; then
+            echo "cluster unreachable, skip"; exit 0
+          fi
+          kubectl delete ingress --all -A --timeout=180s || true
           kubectl get svc -A -o json \
             | jq -r '.items[] | select(.spec.type=="LoadBalancer") | "\(.metadata.namespace) \(.metadata.name)"' \
-            | while read ns name; do kubectl -n "$ns" delete svc "$name" --timeout=60s || true; done
-          kubectl delete pvc --all -A --timeout=60s || true
-          # wait for ALB controller to actually delete ELBs
-          for i in $(seq 1 30); do
-            LBS=$(aws elbv2 describe-load-balancers --region ${{ env.AWS_REGION }} \
-              --query "LoadBalancers[?starts_with(LoadBalancerName,'k8s-')].LoadBalancerArn" --output text)
+            | while read ns name; do kubectl -n "$ns" delete svc "$name" --timeout=120s || true; done
+          # delete StatefulSets first to release PVCs cleanly
+          for ns in vault consul; do
+            kubectl -n "$ns" delete statefulset --all --timeout=120s 2>/dev/null || true
+          done
+          kubectl delete pvc --all -A --timeout=180s || true
+
+      # Phase 3: wait AWS controllers (ALB, ebs-csi) finish reconciling
+      - name: Wait AWS reconciliation
+        run: |
+          VPC=$(aws ec2 describe-vpcs --region $AWS_REGION \
+            --filters "Name=tag:Project,Values=$PROJECT_TAG" \
+            --query "Vpcs[0].VpcId" --output text 2>/dev/null || echo "None")
+          [ "$VPC" = "None" ] || [ -z "$VPC" ] && { echo "no VPC, skip"; exit 0; }
+
+          echo "wait LBs gone in $VPC..."
+          for i in $(seq 1 60); do
+            LBS=$(aws elbv2 describe-load-balancers --region $AWS_REGION \
+              --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text)
             [ -z "$LBS" ] && break
-            echo "waiting for ELB cleanup..."
-            sleep 10
+            echo "  ($i/60) waiting..."; sleep 10
+          done
+
+          echo "wait EBS gone..."
+          for i in $(seq 1 30); do
+            VOLS=$(aws ec2 describe-volumes --region $AWS_REGION \
+              --filters "Name=tag:kubernetes.io/cluster/${CLUSTER_NAME},Values=owned" \
+              --query "Volumes[?State!='deleted'].VolumeId" --output text)
+            [ -z "$VOLS" ] && break
+            echo "  ($i/30) waiting: $VOLS"; sleep 10
           done
 
       - name: Force-unlock stale locks
