@@ -12,6 +12,10 @@ locals {
   alb     = local.env_cfg.locals.alb
 }
 
+# Stack file (terragrunt.stack.hcl) declares depends_on = [unit.aws_alb]
+# for ordering. No terragrunt-level dependency block needed for aws_alb
+# (aws-alb unit has no outputs to consume).
+
 dependency "vpc" {
   config_path = "../vpc"
 
@@ -19,15 +23,6 @@ dependency "vpc" {
     vpc_id         = "vpc-mock"
     public_subnets = ["subnet-mock-1", "subnet-mock-2"]
   }
-  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
-}
-
-# aws-alb installs the controller (provides TargetGroupBinding CRD).
-# Must be ready before this unit applies.
-dependency "aws_alb" {
-  config_path = "../aws-alb"
-
-  mock_outputs                            = {}
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
