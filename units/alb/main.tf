@@ -81,9 +81,26 @@ resource "aws_lb_listener" "main" {
   tags = var.tags
 }
 
+# Ensure target namespace exists. ArgoCD (payments-app Application) will sync
+# resources into it later; CreateNamespace=true syncOption is idempotent.
+resource "kubernetes_namespace" "target" {
+  metadata {
+    name = var.service_namespace
+    labels = {
+      "linkerd.io/inject" = "enabled"
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [metadata[0].labels, metadata[0].annotations]
+  }
+}
+
 # TargetGroupBinding CR — controller registers pods of <service> to <TG>.
 # CRD provided by aws-load-balancer-controller (installed by aws-alb unit).
 resource "kubernetes_manifest" "target_group_binding" {
+  depends_on = [kubernetes_namespace.target]
+
   manifest = {
     apiVersion = "elbv2.k8s.aws/v1beta1"
     kind       = "TargetGroupBinding"
