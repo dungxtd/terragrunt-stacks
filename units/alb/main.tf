@@ -7,6 +7,8 @@ locals {
 }
 
 resource "aws_security_group" "alb" {
+  #checkov:skip=CKV_AWS_260:Public ALB by design — ingress port 80 from internet is the entire purpose
+  #checkov:skip=CKV_AWS_382:ALB needs egress to pod IPs across VPC; restricting to VPC CIDR would still hit this rule
   name        = "${var.project}-alb"
   description = "ALB ingress for ${var.project}"
   vpc_id      = var.vpc_id
@@ -31,11 +33,16 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_lb" "main" {
-  name               = "${var.project}-alb"
-  load_balancer_type = "application"
-  internal           = var.scheme == "internal"
-  subnets            = var.public_subnet_ids
-  security_groups    = [aws_security_group.alb.id]
+  #checkov:skip=CKV_AWS_91:Access logging requires S3 bucket; not enabled for free-tier demo to avoid storage cost
+  #checkov:skip=CKV_AWS_150:Deletion protection disabled to allow clean teardown via terragrunt destroy
+  #checkov:skip=CKV2_AWS_20:HTTPS redirect requires ACM cert; only enabled when var.certificate_arn is set
+  #checkov:skip=CKV2_AWS_28:WAF not provisioned in this stack
+  name                       = "${var.project}-alb"
+  load_balancer_type         = "application"
+  internal                   = var.scheme == "internal"
+  subnets                    = var.public_subnet_ids
+  security_groups            = [aws_security_group.alb.id]
+  drop_invalid_header_fields = true
 
   tags = var.tags
 }
