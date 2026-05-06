@@ -48,7 +48,7 @@ resource "aws_lb" "main" {
 }
 
 resource "aws_lb_target_group" "frontend" {
-  name        = "${var.project}-frontend"
+  name_prefix = "tgf-"
   port        = var.service_port
   protocol    = "HTTP"
   target_type = "ip"
@@ -64,6 +64,10 @@ resource "aws_lb_target_group" "frontend" {
   }
 
   tags = var.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_lb_listener" "main" {
