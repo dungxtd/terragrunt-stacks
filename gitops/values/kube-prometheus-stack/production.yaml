@@ -5,6 +5,23 @@
 crds:
   enabled: true
 
+# EKS managed control plane — no access to these components.
+# Disable scrapers to avoid SyncFailed (kube-system namespace not in project).
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
+# coreDNS scraper still useful — but it deploys ServiceMonitor to kube-system,
+# blocked by AppProject. Disable until needed (Linkerd-viz prom covers DNS health).
+coreDns:
+  enabled: false
+kubeApiServer:
+  enabled: true   # API server metrics served via k8s default svc, no kube-system SM
+
 # AlertManager: disabled — no on-call yet
 alertmanager:
   enabled: false
