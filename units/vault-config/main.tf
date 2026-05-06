@@ -32,7 +32,7 @@ data "aws_secretsmanager_secret_version" "rds_master" {
 }
 
 locals {
-  db_password = length(data.aws_secretsmanager_secret_version.rds_master) > 0 ? jsondecode(data.aws_secretsmanager_secret_version.rds_master[0].secret_string)["password"] : "pending"
+  db_password = var.rds_master_secret_arn != "" ? jsondecode(data.aws_secretsmanager_secret_version.rds_master[0].secret_string)["password"] : var.rds_master_password
 }
 
 resource "vault_mount" "database" {
@@ -49,6 +49,13 @@ resource "vault_database_secret_backend_connection" "postgres" {
     connection_url = "postgresql://{{username}}:{{password}}@${var.rds_endpoint}/payments?sslmode=${var.db_ssl_mode}"
     username       = var.rds_username
     password       = local.db_password
+  }
+
+  lifecycle {
+    precondition {
+      condition     = local.db_password != ""
+      error_message = "Set rds_master_secret_arn (production) or rds_master_password (ministack). Refusing to configure Vault DB engine with empty password."
+    }
   }
 }
 

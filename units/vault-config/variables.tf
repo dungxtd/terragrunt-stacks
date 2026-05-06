@@ -37,6 +37,14 @@ variable "rds_username" {
 variable "rds_master_secret_arn" {
   description = "ARN of the Secrets Manager secret holding {username,password} for the RDS master user. Sourced from the rds unit output."
   type        = string
+  default     = ""
+}
+
+variable "rds_master_password" {
+  description = "RDS master password for ministack/dev only. Use rds_master_secret_arn in production."
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "db_ssl_mode" {

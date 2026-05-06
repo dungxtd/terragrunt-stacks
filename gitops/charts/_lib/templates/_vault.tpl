@@ -8,6 +8,8 @@
 {{- $v := .svc.vault -}}
 {{- if and (eq $ctx.Values.secrets "vault") $v }}
 vault.hashicorp.com/agent-inject: "true"
+vault.hashicorp.com/agent-init-first: "true"
+vault.hashicorp.com/agent-pre-populate-only: "false"
 vault.hashicorp.com/role: {{ $v.role | quote }}
 {{- if $v.secret }}
 vault.hashicorp.com/agent-inject-secret-application.properties: {{ $v.secret | quote }}
