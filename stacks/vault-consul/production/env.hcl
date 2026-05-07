@@ -84,9 +84,11 @@ locals {
   # ── ALB (TF-managed) ─────────────────────────────────────────
   # The ALB lives in TF state. K8s TargetGroupBinding (in alb unit) registers
   # pods of <service_namespace>/<service_name>:<service_port> to the TG.
+  # ALB targets payments-app-primary (created by Flagger when canary.enabled).
+  # When canary disabled, switch back to "payments-app".
   alb = {
     service_namespace = "payments-app"
-    service_name      = "payments-app"
+    service_name      = "payments-app-primary"
     service_port      = 8080
     listen_port       = 80
     scheme            = "internet-facing" # "internal" for private

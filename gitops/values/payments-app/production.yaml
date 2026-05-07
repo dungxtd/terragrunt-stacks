@@ -4,7 +4,8 @@ mesh: linkerd
 secrets: vault
 
 canary:
-  enabled: false   # standalone payments-app, no public-api/frontend traffic to canary
+  enabled: true
+  metricsServer: "http://prometheus.linkerd-viz:9090"   # Linkerd-viz Prometheus scrapes mesh metrics
 
 vault:
   address: "http://vault.vault.svc.cluster.local:8200"

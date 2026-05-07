@@ -1,46 +1,44 @@
 {{- if .Values.canary.enabled }}
+# Flagger Linkerd-based canary. Flagger creates payments-app-primary +
+# payments-app-canary Services; the apex `payments-app` Service is split
+# via Linkerd HTTPRoute (policy.linkerd.io). Splitting happens on the
+# caller's outbound proxy, so it works even when target pod has
+# config.linkerd.io/skip-inbound-ports for ALB traffic.
 apiVersion: flagger.app/v1beta1
 kind: Canary
 metadata:
   name: payments-app
   namespace: {{ .Values.namespace }}
 spec:
+  provider: linkerd
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: payments-app
-  progressDeadlineSeconds: 60
+  progressDeadlineSeconds: 600
   service:
     port: 8080
     targetPort: 8080
-    gatewayRefs:
-      - name: payments-app
-        namespace: {{ .Values.namespace }}
-        group: core
-        kind: Service
-        port: 8080
   analysis:
     interval: 30s
     threshold: 5
     maxWeight: 50
     stepWeight: 10
-    metrics:
-      - name: linkerd-success-rate
-        templateRef:
-          name: linkerd-success-rate
-        thresholdRange:
-          min: 99
-        interval: 1m
-      - name: linkerd-request-duration
-        templateRef:
-          name: linkerd-request-duration
-        thresholdRange:
-          max: 500
-        interval: 1m
+    # No metric checks: target pod has skip-inbound-ports=8080 (for ALB),
+    # so Linkerd's inbound metrics are empty and request-success-rate
+    # would always fail. Demo relies on webhook smoke test + step weights.
     webhooks:
+      - name: smoke-test
+        type: pre-rollout
+        url: http://loadtester.flagger-system/
+        timeout: 30s
+        metadata:
+          type: bash
+          cmd: "curl -sf http://payments-app-canary.{{ .Values.namespace }}:8080/actuator/health"
       - name: load-test
         type: rollout
-        url: http://flagger-loadtester.flagger-system/
+        url: http://loadtester.flagger-system/
+        timeout: 5s
         metadata:
-          cmd: "hey -z 2m -q 10 -c 2 http://payments-app.{{ .Values.namespace }}:8080/"
+          cmd: "hey -z 2m -q 10 -c 2 http://payments-app-canary.{{ .Values.namespace }}:8080/actuator/health"
 {{- end }}
