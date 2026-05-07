@@ -92,6 +92,14 @@ pf-rds-stop: ## Tear down socat proxy pod + kill port-forward on :5432
 
 pf-all: pf-argocd pf-vault pf-linkerd pf-jaeger pf-hotrod pf-grafana pf-prometheus pf-app ## Port-forward all UIs
 
+# Kill any process holding given port. Usage: make pf-kill PORT=8080
+.PHONY: pf-kill
+pf-kill: ## Kill the port-forward on PORT (e.g. make pf-kill PORT=8080)
+	@if [ -z "$(PORT)" ]; then echo "Usage: make pf-kill PORT=<port>"; exit 1; fi
+	@PIDS=$$(lsof -ti :$(PORT) 2>/dev/null); \
+	if [ -z "$$PIDS" ]; then echo "no process on :$(PORT)"; \
+	else echo "$$PIDS" | xargs kill 2>/dev/null && echo "✓ killed pid(s) on :$(PORT)"; fi
+
 pf-stop: ## Kill all port-forwards (UIs + DBs)
 	@lsof -ti :8080,:8200,:8084,:16686,:8090,:3000,:9090,:8082,:5432 | xargs kill 2>/dev/null || true
 	@kubectl --kubeconfig $(KC) delete pod rds-proxy -n payments-app --ignore-not-found 2>/dev/null || true
