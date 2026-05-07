@@ -26,12 +26,22 @@ dependency "vpc" {
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
+dependency "eks" {
+  config_path = "../eks"
+
+  mock_outputs = {
+    node_security_group_id = "sg-mock"
+  }
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 inputs = {
-  project           = local.common.locals.project
-  region            = local.common.locals.region
-  vpc_id            = dependency.vpc.outputs.vpc_id
-  public_subnet_ids = dependency.vpc.outputs.public_subnets
-  tags              = local.common.locals.common_tags
+  project                = local.common.locals.project
+  region                 = local.common.locals.region
+  vpc_id                 = dependency.vpc.outputs.vpc_id
+  public_subnet_ids      = dependency.vpc.outputs.public_subnets
+  node_security_group_id = dependency.eks.outputs.node_security_group_id
+  tags                   = local.common.locals.common_tags
 
   # Per-env ALB config (defined in env.hcl).
   service_namespace = local.alb.service_namespace

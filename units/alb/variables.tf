@@ -57,6 +57,11 @@ variable "certificate_arn" {
   default     = ""
 }
 
+variable "node_security_group_id" {
+  description = "EKS managed-node-group SG (additional node SG, not the cluster primary SG). ALB needs ingress rule to reach pod IPs on the service port."
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags"
   type        = map(string)
