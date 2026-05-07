@@ -213,11 +213,12 @@ This creates one ArgoCD Application named `root`, which watches `gitops/apps/` r
 |---|---|---|
 | 0 | external-secrets | Helm operator that fetches secrets from Vault → creates k8s Secret objects |
 | 1 | secret-stores | Configures `SecretStore` CRs that point external-secrets at Vault |
-| 2 | datadog | Installs the Datadog agent (logs/metrics) |
+| 2 | kube-prometheus-stack | Prometheus + Grafana (cluster + pod metrics) |
 | 3 | flagger / loadtester | Canary deployment controller + traffic generator |
-| 4 | payments-app | The actual app: frontend, API, processor, product DB |
+| 4 | payments-app | Single Spring Boot service using Vault → RDS dynamic creds |
+| 5 | jaeger-demo | Jaeger all-in-one + HotROD (distributed tracing demo) |
 
-When the `payments-app` `frontend` pod becomes Ready, the aws-alb-controller (running since step 6a) sees it via the TargetGroupBinding from step 6d and registers its IP into the AWS Target Group. Now the ALB's public DNS serves real traffic.
+When the `payments-app` pod becomes Ready, the aws-alb-controller (running since step 6a) registers its IP into the TF-owned Target Group via the `TargetGroupBinding` (created by the `alb` Terraform unit at step 6d). The ALB's public DNS now serves real traffic on `:80 → payments-app:8080`.
 
 ---
 
@@ -327,42 +328,37 @@ sequenceDiagram
     participant DNS as Public DNS
     participant ALB as AWS ALB
     participant TG as Target Group
-    participant FE as frontend pod<br/>(+ Linkerd sidecar)
-    participant PAPI as public-api pod<br/>(+ Linkerd sidecar)
-    participant APP as payments-app pod<br/>(+ Linkerd sidecar)
+    participant APP as payments-app pod<br/>(Linkerd + vault-agent sidecars)
     participant VLT as Vault
     participant DB as RDS Postgres
-    participant DD as Datadog agent
+    participant PROM as kube-prometheus-stack
     participant LV as Linkerd-viz
+    participant JG as Jaeger
 
-    U->>DNS: GET hashicups.example.com
+    U->>DNS: GET <alb-dns>/actuator/health
     DNS-->>U: A record → ALB DNS
-    U->>ALB: HTTP/HTTPS request
+    U->>ALB: HTTP request :80
     ALB->>TG: Pick healthy target (round-robin)
-    TG->>FE: Forward to pod IP:80
-    Note over FE: Linkerd sidecar accepts<br/>plaintext from ALB,<br/>terminates inbound proxy
-    FE->>PAPI: HTTP /api → public-api:8080<br/>(plaintext from app code)
-    Note over FE,PAPI: Linkerd sidecars upgrade<br/>connection to mTLS automatically
-    PAPI->>APP: HTTP → payments-app:8080
-    Note over APP: First request:<br/>vault-agent sidecar fetches<br/>DB creds from Vault
+    TG->>APP: Forward to pod IP:8080
+    Note over APP: Linkerd skip-inbound-ports=8080<br/>so ALB plain HTTP bypasses<br/>mTLS upgrade attempt
 
-    APP->>VLT: AppRole/SA login
+    Note over APP: First request:<br/>vault-agent sidecar already<br/>fetched DB creds at pod start
+    APP->>VLT: (at pod start) k8s SA login
     VLT-->>APP: Vault token
     APP->>VLT: GET database/creds/payments
-    Note over VLT,DB: Vault generates new DB user<br/>with TTL=1h (dynamic creds)
+    Note over VLT,DB: Vault generates DB user<br/>TTL=1h (dynamic creds)
     VLT->>DB: CREATE USER + GRANT
     VLT-->>APP: { username, password, lease_id }
+    Note over APP: Spring app reads<br/>/vault/secrets/application.properties
     APP->>DB: SELECT ... (using Vault-issued creds)
     DB-->>APP: rows
-    APP-->>PAPI: JSON response
-    PAPI-->>FE: JSON response
-    FE-->>ALB: HTTP 200 + HTML/JSON
+    APP-->>ALB: HTTP 200 JSON
     ALB-->>U: HTTP 200
 
     par Observability (continuous, async)
-        FE->>DD: stdout logs → Datadog agent (DaemonSet)
-        APP->>DD: stdout logs
-        FE->>LV: Linkerd proxy metrics<br/>(success rate, p99 latency)
+        APP->>PROM: /actuator/prometheus scraped
+        APP->>LV: Linkerd proxy metrics (success rate, p99)
+        APP->>JG: OTLP spans (when emitted)
     end
 ```
 
@@ -372,75 +368,63 @@ sequenceDiagram
 
 User's browser does a DNS lookup for the app's hostname (in a real setup you'd put a CNAME pointing to the ALB DNS — for demo, you can hit the ALB DNS directly).
 
-The ALB lives in public subnets and has a security group allowing port 80 from `0.0.0.0/0`.
+The ALB lives in public subnets, security group allows :80 from `0.0.0.0/0`. A separate SG ingress rule on the EKS node SG (`aws_security_group_rule.alb_to_node` in `units/alb`) allows ALB → pod traffic on the service port.
 
 #### 4. Target Group selects pod
 
-The ALB's HTTP listener forwards to a Target Group. The Target Group has a list of pod IPs (registered by `aws-alb-controller` because of the `TargetGroupBinding` we declared in the `alb` Terraform unit).
+The ALB's HTTP listener forwards to a TF-owned Target Group. Pod IPs are registered by `aws-load-balancer-controller` watching the `TargetGroupBinding` CR (created by the `alb` Terraform unit).
 
-Health checks on the TG (`GET /` expects 200-399) ensure only Ready pods get traffic.
+Health checks on the TG (`GET /actuator/health` expects 200-399) ensure only Ready pods get traffic.
 
-#### 5-6. Pod receives, Linkerd handles
+#### 5. Pod receives traffic
 
-Each pod has 2 containers running:
-- The actual app container (`frontend`)
-- A Linkerd `proxy` sidecar (auto-injected because the namespace has `linkerd.io/inject=enabled`)
+Each `payments-app` pod has 3 containers:
+- `payments-app` — Spring Boot REST service on :8080
+- `linkerd-proxy` — sidecar (auto-injected; mTLS for **other pod-to-pod** traffic)
+- `vault-agent` — sidecar that fetched DB creds at pod start
 
-The sidecar transparently:
-- Terminates incoming connections
-- Upgrades pod-to-pod traffic to mTLS (without app code knowing)
-- Records latency, success rate, traffic volume
+The pod has annotation `config.linkerd.io/skip-inbound-ports: "8080"` so ALB's plain HTTP bypasses Linkerd's mTLS upgrade — the proxy passes the request straight to the app. (Pod-to-pod traffic on other ports still mTLS.)
 
-#### 7-8. Internal mTLS hops
+#### 6-13. Vault dynamic database credentials (happens at pod start, not per request)
 
-`frontend` → `public-api` → `payments-app`. Each hop:
-- App code makes a plain HTTP call to `<service>:<port>`
-- Local Linkerd sidecar intercepts, encrypts, sends to remote sidecar
-- Remote sidecar decrypts, hands plaintext to remote app
+When the pod starts:
 
-App developer sees plaintext. Network sees mTLS only.
+1. **vault-agent sidecar** authenticates to Vault using the pod's Kubernetes ServiceAccount token (Kubernetes auth method, role `payments`).
+2. Agent calls `payments-app/database/creds/payments`. Vault's DB secrets engine runs `CREATE USER + GRANT` on RDS, returns username/password with a 1-hour lease.
+3. Agent renders these creds into `/vault/secrets/application.properties` (Spring Boot picks it up via `SPRING_CONFIG_ADDITIONAL_LOCATION`).
+4. Spring app boots, opens HikariCP connection pool with those creds.
+5. Lease auto-renewed every ~30 min by vault-agent. If pod terminates, Vault revokes the lease, RDS user deleted.
 
-#### 9-13. Vault dynamic database credentials
-
-When `payments-app` needs to query the database:
-
-1. The pod has a **vault-agent sidecar** (separate from Linkerd's sidecar — it's a Helm-chart-injected init/sidecar that handles secret retrieval).
-2. Vault-agent authenticates to Vault using the pod's Kubernetes ServiceAccount token (Kubernetes auth method).
-3. Vault-agent calls `database/creds/payments`. Vault, using its DB secrets engine, runs `CREATE USER + GRANT` on RDS, returns a fresh username/password with a 1-hour lease.
-4. Vault-agent writes the creds to a file inside the pod (`/vault/secrets/database.properties`).
-5. App reads the file and connects to RDS.
-
-When the lease expires, Vault revokes the user automatically. **No long-lived password ever exists in the app's memory or environment.**
+**No long-lived password ever stored in the app's env, image, or volumes.**
 
 #### 14-16. Database and response
 
-The app queries RDS using the short-lived creds, gets results, returns up the chain.
+Spring Boot service handles request, queries RDS via existing pool, returns JSON.
 
 #### 17-18. Response back to user
 
-`payments-app` → `public-api` → `frontend` → ALB → user. All inter-pod hops are mTLS via Linkerd.
+Direct: `payments-app` → ALB → user. No proxy chain (we trimmed the multi-service hashicorp demo to keep only the RDS-using piece).
 
 #### Async — Observability
 
-While the request flows, two things happen continuously:
+While the request flows, three things happen continuously:
 
-- **Datadog agent (DaemonSet on every node)** scrapes pod stdout/stderr, OS metrics, k8s events. Sends to Datadog SaaS.
+- **kube-prometheus-stack Prometheus** scrapes pod metrics (`/actuator/prometheus`), node-exporter, kube-state-metrics. Grafana renders dashboards.
 - **Linkerd proxies** emit golden metrics (success rate, requests/sec, p50/p95/p99 latency) which `linkerd-viz` aggregates. View them with `linkerd viz dashboard`.
+- **Jaeger** receives OTLP spans on `:4318` (used by HotROD demo and any app instrumented with OTel).
 
 ### What each component contributes
 
 ```mermaid
 flowchart LR
     Req([HTTP request]) --> ALB
-    ALB -->|"routing<br/>+ TLS termination"| FE[frontend]
-    FE -->|"mTLS<br/>(Linkerd)"| API[backend services]
-    API -->|"dynamic DB creds<br/>(Vault)"| DB[(Postgres)]
+    ALB -->|"routing"| APP[payments-app pod]
+    APP -->|"dynamic DB creds<br/>(Vault)"| DB[(RDS Postgres)]
 
-    Vault[Vault] -.issues short-lived creds.-> API
-    Linkerd[Linkerd sidecars] -.encrypts pod-to-pod.-> API
-    Linkerd -.encrypts.-> FE
-    Datadog[Datadog agent] -.collects logs/metrics.-> FE
-    Datadog -.collects.-> API
+    Vault[Vault] -.issues short-lived creds.-> APP
+    Linkerd[Linkerd sidecars] -.encrypts pod-to-pod.-> APP
+    PROM[kube-prometheus-stack] -.scrapes metrics.-> APP
+    JG[Jaeger] -.receives traces.-> APP
 
     style Req fill:#dff
     style DB fill:#fed
@@ -450,12 +434,13 @@ flowchart LR
 | Component | Job at request time |
 |---|---|
 | **ALB** | Public entry point. Decides which pod gets the request based on TG health checks. |
-| **aws-alb-controller** | Idle at request time. Only acts when pods come and go (registers/deregisters from TG). |
-| **Linkerd sidecars** | Encrypt every pod-to-pod hop with mTLS. Auto-retry on transient 5xx. Emit metrics. |
+| **aws-load-balancer-controller** | Idle at request time. Only acts when pods come and go (registers/deregisters via TGB). |
+| **Linkerd sidecars** | Encrypt pod-to-pod hops on non-skipped ports with mTLS. Skip-inbound on :8080 lets ALB through. |
 | **Vault** | Issues short-lived DB creds on demand. Apps never store passwords. |
-| **vault-agent sidecar** | (Inside each app pod that needs secrets.) Handles Vault login + secret fetch + lease renewal. |
-| **Datadog agent** | Collects logs/metrics out-of-band. Doesn't sit in request path. |
+| **vault-agent sidecar** | Inside payments-app pod. Handles Vault login + secret fetch + lease renewal. |
+| **kube-prometheus-stack** | Scrapes metrics out-of-band. Doesn't sit in request path. |
 | **Linkerd-viz** | Dashboard showing service-graph latency. Out-of-band. |
+| **Jaeger** | OTLP collector. Out-of-band; receives spans when apps emit them. |
 | **ArgoCD** | Idle at request time. Only acts when Git changes (re-syncs k8s state). |
 | **EKS control plane** | Idle. Only acts when pods are created/deleted. |
 | **RDS** | Stores actual data. Returns rows. |
@@ -464,15 +449,16 @@ flowchart LR
 
 | If this dies | Effect on user requests |
 |---|---|
-| **ALB** | All traffic stops. Single point of failure (mitigate with multi-AZ — already done) |
-| **All frontend pods** | 503 from ALB |
-| **Single frontend pod** | TG marks unhealthy, ALB skips it. No user impact (other replicas handle) |
-| **Linkerd control plane** | Existing connections keep working (sidecars cache config). New pods can't get certs → eventually fail to start |
-| **Vault** | Apps can't fetch new DB creds. Existing leases keep working until expiry (~1h). After that, DB calls fail |
-| **RDS** | DB queries fail → 500s for any endpoint that hits Postgres |
-| **Datadog** | No observability, but request flow unaffected |
-| **ArgoCD** | No deployments possible. Running apps unaffected |
-| **Linkerd-viz** | Dashboard unavailable. mTLS still works (control plane runs Linkerd-viz separately) |
+| **ALB** | All public traffic stops. Multi-AZ ALB itself, but single LB instance for this stack. |
+| **All payments-app replicas** | 503 from ALB |
+| **Single payments-app pod** | TG marks unhealthy, ALB skips it. No impact if more replicas exist (currently 1). |
+| **Linkerd control plane** | Existing connections keep working (sidecars cache config). New pods can't get certs → eventually fail to start. |
+| **Vault** | Apps can't fetch new DB creds. Existing leases keep working until expiry (~1h). After that, DB calls fail. |
+| **RDS** | DB queries fail → 500 from any endpoint that hits Postgres. |
+| **kube-prometheus-stack** | No metrics, but request flow unaffected. |
+| **Jaeger** | Traces lost; request flow unaffected. |
+| **ArgoCD** | No deployments possible. Running apps unaffected. |
+| **Linkerd-viz** | Dashboard unavailable. mTLS still works (linkerd-viz is observability-only). |
 
 This blast-radius table is the value of the architecture: each component fails independently. None take down the whole system.
 
