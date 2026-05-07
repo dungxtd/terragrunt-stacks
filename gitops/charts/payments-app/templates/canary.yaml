@@ -1,44 +1,5 @@
-{{- /*
-  Per-service Flagger Linkerd canary. Opt-in via svc.canary: true on each
-  entry in Values.services. Drop a new service into Values.services with
-  canary: true and a Canary CR is generated for it automatically.
-*/}}
+{{- /* Per-service Flagger canary via _lib helper */ -}}
 {{- range $name, $svc := .Values.services }}
-{{- if $svc.canary }}
 ---
-apiVersion: flagger.app/v1beta1
-kind: Canary
-metadata:
-  name: {{ $name }}
-  namespace: {{ $.Values.namespace }}
-spec:
-  provider: linkerd
-  targetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: {{ $name }}
-  progressDeadlineSeconds: 600
-  service:
-    port: {{ $svc.servicePort | default $svc.port }}
-    targetPort: {{ $svc.port }}
-  analysis:
-    interval: {{ $svc.canaryInterval | default "30s" }}
-    threshold: {{ $svc.canaryThreshold | default 5 }}
-    maxWeight: {{ $svc.canaryMaxWeight | default 50 }}
-    stepWeight: {{ $svc.canaryStepWeight | default 10 }}
-    webhooks:
-      - name: smoke-test
-        type: pre-rollout
-        url: http://loadtester.flagger-system/
-        timeout: 30s
-        metadata:
-          type: bash
-          cmd: "curl -sf http://{{ $name }}-canary.{{ $.Values.namespace }}:{{ $svc.servicePort | default $svc.port }}{{ $svc.canaryHealthPath | default "/" }}"
-      - name: load-test
-        type: rollout
-        url: http://loadtester.flagger-system/
-        timeout: 5s
-        metadata:
-          cmd: "hey -z {{ $svc.canaryLoadDuration | default "2m" }} -q 10 -c 2 http://{{ $name }}-canary.{{ $.Values.namespace }}:{{ $svc.servicePort | default $svc.port }}{{ $svc.canaryHealthPath | default "/" }}"
-{{- end }}
+{{ include "lib.canary" (dict "ctx" $ "name" $name "svc" $svc) }}
 {{- end }}
