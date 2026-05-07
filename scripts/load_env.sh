@@ -56,16 +56,12 @@ fi
 
 export ARGOCD_ADMIN_PASS=$(KUBECONFIG="${KUBECONFIG:-}" kubectl get secrets -n argocd argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d || echo "")
 
-# Trim VAULT_TOKEN preview for display (security)
-TOKEN_PREVIEW=""
-[ -n "$VAULT_TOKEN" ] && TOKEN_PREVIEW="${VAULT_TOKEN:0:8}…(${#VAULT_TOKEN} chars)"
-
 echo "Environment ($ENV):"
 echo "  AWS_PROFILE=${AWS_PROFILE:-(unset)}"
 echo "  AWS_REGION=$AWS_REGION"
 echo "  KUBECONFIG=$KUBECONFIG"
 echo "  EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME"
 echo "  VAULT_ADDR=$VAULT_ADDR  (run 'make pf-vault' to forward)"
-echo "  VAULT_TOKEN=$TOKEN_PREVIEW"
+echo "  VAULT_TOKEN=$VAULT_TOKEN"
 echo "  ARGOCD_SERVER=$ARGOCD_SERVER  (run 'make pf-argocd' if localhost)"
 echo "  ARGOCD_ADMIN_PASS=$ARGOCD_ADMIN_PASS  (user: admin)"
