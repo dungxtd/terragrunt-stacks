@@ -38,7 +38,7 @@ locals {
   create_cluster_addons                    = true
   enable_cluster_creator_admin_permissions = true
   update_launch_template_default_version   = true
-  use_latest_ami_release_version           = true
+  use_latest_ami_release_version           = false # disabled: forced AMI bumps caused NodeCreationFailure on join
   eks_kubernetes_version                   = "1.35"
   eks_node_instance_types                  = ["t3.small"]
   eks_node_min_size                        = 5
