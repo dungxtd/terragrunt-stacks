@@ -12,13 +12,6 @@ if [[ "$ENV" != "production" && "$ENV" != "ministack" ]]; then
   return 1
 fi
 
-STACK_DIR="$REPO_ROOT/stacks/vault-consul/$ENV/.terragrunt-stack"
-
-tg_output() {
-  local unit="$1" key="$2"
-  cd "$STACK_DIR/$unit" && terragrunt output -raw "$key" 2>/dev/null || echo ""
-}
-
 if [ "$ENV" = "ministack" ]; then
   export KUBECONFIG="$REPO_ROOT/.kubeconfig-ministack"
   export VAULT_ADDR="http://localhost:18200"
@@ -27,22 +20,44 @@ if [ "$ENV" = "ministack" ]; then
   export EKS_CLUSTER_NAME="terragrunt-infra-eks"
   export ARGOCD_SERVER="https://localhost:30443"
 else
-  export AWS_PROFILE="terragrunt"
-  export VAULT_ADDR=$(tg_output vault vault_address)
-  export VAULT_TOKEN=$(tg_output vault vault_root_token)
-  export AWS_REGION=$(tg_output vpc region)
-  export EKS_CLUSTER_NAME=$(tg_output eks cluster_name)
+  : "${AWS_PROFILE:=default}"
+  export AWS_PROFILE
+  export AWS_REGION="ap-southeast-1"
+  export EKS_CLUSTER_NAME="terragrunt-infra-eks"
   export KUBECONFIG="$HOME/.kube/config"
-  export ARGOCD_SERVER="https://$(kubectl get svc -n argocd argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "localhost")"
+
+  # Vault token: read directly from SSM (where scripts/vault-init.sh wrote it).
+  # Reading via `terragrunt output` returns stale placeholder captured in
+  # state before the init script overwrote SSM.
+  export VAULT_TOKEN=$(aws ssm get-parameter \
+    --name /terragrunt-infra/vault/root-token \
+    --with-decryption \
+    --query Parameter.Value \
+    --output text 2>/dev/null || echo "")
+
+  # Vault is in-cluster only — use port-forward (make pf-vault) and address localhost.
+  export VAULT_ADDR="http://localhost:18200"
+
+  ARGOCD_HOSTNAME=$(kubectl get svc -n argocd argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+  if [ -n "$ARGOCD_HOSTNAME" ]; then
+    export ARGOCD_SERVER="https://$ARGOCD_HOSTNAME"
+  else
+    export ARGOCD_SERVER="https://localhost:8080"  # via make pf-argocd
+  fi
 fi
 
 export ARGOCD_ADMIN_PASS=$(KUBECONFIG="${KUBECONFIG:-}" kubectl get secrets -n argocd argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d || echo "")
 
+# Trim VAULT_TOKEN preview for display (security)
+TOKEN_PREVIEW=""
+[ -n "$VAULT_TOKEN" ] && TOKEN_PREVIEW="${VAULT_TOKEN:0:8}…(${#VAULT_TOKEN} chars)"
+
 echo "Environment ($ENV):"
-echo "  KUBECONFIG=$KUBECONFIG"
-echo "  VAULT_ADDR=$VAULT_ADDR"
-echo "  VAULT_TOKEN=$VAULT_TOKEN"
-echo "  ARGOCD_SERVER=$ARGOCD_SERVER"
-echo "  ARGOCD_ADMIN_PASS=$ARGOCD_ADMIN_PASS  (user: admin)"
+echo "  AWS_PROFILE=${AWS_PROFILE:-(unset)}"
 echo "  AWS_REGION=$AWS_REGION"
+echo "  KUBECONFIG=$KUBECONFIG"
 echo "  EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME"
+echo "  VAULT_ADDR=$VAULT_ADDR  (run 'make pf-vault' to forward)"
+echo "  VAULT_TOKEN=$TOKEN_PREVIEW"
+echo "  ARGOCD_SERVER=$ARGOCD_SERVER  (run 'make pf-argocd' if localhost)"
+echo "  ARGOCD_ADMIN_PASS=$ARGOCD_ADMIN_PASS  (user: admin)"
