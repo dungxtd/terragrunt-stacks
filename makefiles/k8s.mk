@@ -44,7 +44,7 @@ define pf
 		sleep 1 && echo "✓ $(3)/$(1) → localhost:$(subst :, → ,$(2))"
 endef
 
-.PHONY: pf-argocd pf-vault pf-linkerd pf-consul pf-app pf-all pf-stop
+.PHONY: pf-argocd pf-vault pf-linkerd pf-jaeger pf-hotrod pf-grafana pf-prometheus pf-app pf-all pf-stop
 pf-argocd: ## ArgoCD UI → localhost:8080  (user: admin, pass: make argocd-password)
 	$(call pf,argocd-server,8080:80,argocd)
 
@@ -54,14 +54,20 @@ pf-vault: ## Vault UI → localhost:8200
 pf-linkerd: ## Linkerd viz dashboard → localhost:8084
 	$(call pf,web,8084:8084,linkerd-viz)
 
-pf-consul: ## Consul UI → localhost:8500
-	$(call pf,consul-ui,8500:80,consul)
+pf-jaeger: ## Jaeger UI → localhost:16686
+	$(call pf,jaeger,16686:16686,tracing)
 
-pf-app: ## payments-app frontend → localhost:8081
-	$(call pf,frontend,8081:80,payments-app)
+pf-hotrod: ## HotROD demo UI → localhost:8090
+	$(call pf,hotrod,8090:8080,tracing)
 
-pf-product-db: ## product-db → localhost:5433  (connect: psql -h localhost -p 5433 -U postgres -d products)
-	$(call pf,product-db,5433:5432,payments-app)
+pf-grafana: ## Grafana → localhost:3000  (user: admin, pass: admin)
+	$(call pf,kube-prometheus-stack-grafana,3000:80,monitoring)
+
+pf-prometheus: ## Prometheus → localhost:9090
+	$(call pf,kube-prometheus-stack-prometheus,9090:9090,monitoring)
+
+pf-app: ## payments-app → localhost:8082
+	$(call pf,payments-app,8082:8080,payments-app)
 
 # RDS is in a private subnet — ExternalName svc has no pod, kubectl port-forward won't work.
 # pf-rds spins up a socat proxy pod that bridges localhost:5432 → RDS, then port-forwards it.
@@ -84,10 +90,10 @@ pf-rds-stop: ## Tear down socat proxy pod + kill port-forward on :5432
 	@kubectl --kubeconfig $(KC) delete pod rds-proxy -n payments-app --ignore-not-found
 	@echo "✓ rds-proxy stopped"
 
-pf-all: pf-argocd pf-vault pf-linkerd pf-consul pf-app pf-product-db ## Port-forward all UIs
+pf-all: pf-argocd pf-vault pf-linkerd pf-jaeger pf-hotrod pf-grafana pf-prometheus pf-app ## Port-forward all UIs
 
 pf-stop: ## Kill all port-forwards (UIs + DBs)
-	@lsof -ti :8080,:8200,:8084,:8500,:8081,:5432,:5433 | xargs kill 2>/dev/null || true
+	@lsof -ti :8080,:8200,:8084,:16686,:8090,:3000,:9090,:8082,:5432 | xargs kill 2>/dev/null || true
 	@kubectl --kubeconfig $(KC) delete pod rds-proxy -n payments-app --ignore-not-found 2>/dev/null || true
 	@echo "✓ All port-forwards stopped"
 
