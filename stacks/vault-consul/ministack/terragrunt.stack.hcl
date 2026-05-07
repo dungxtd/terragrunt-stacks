@@ -31,12 +31,7 @@ unit "vault" {
   path   = "vault"
 }
 
-# ── Layer 5: Vault Config + PKI ──────────────────────────────────
-
-unit "certs" {
-  source = "../../../units/certs"
-  path   = "certs"
-}
+# ── Layer 5: Vault Config ────────────────────────────────────────
 
 unit "vault_config" {
   source = "../../../units/vault-config"

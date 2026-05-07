@@ -1,20 +1,11 @@
 locals {
-  app_projects = concat(
-    [
-      {
-        name        = "payments-app"
-        description = "Payments application project"
-        namespace   = "payments-app"
-      }
-    ],
-    var.enable_consul_project ? [
-      {
-        name        = "consul"
-        description = "Consul service mesh project"
-        namespace   = "consul"
-      }
-    ] : []
-  )
+  app_projects = [
+    {
+      name        = "payments-app"
+      description = "Payments application project"
+      namespace   = "payments-app"
+    }
+  ]
 }
 
 resource "helm_release" "argocd" {

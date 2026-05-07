@@ -38,14 +38,14 @@ docs/                 — architecture.md, adr/, runbooks/, archive/
 | kms | 3 | KMS key for Vault auto-unseal |
 | rds | 4 | PostgreSQL RDS |
 | vault-irsa | 4 | AWS HA only: IAM role for Vault KMS auto-unseal |
-| vault | 4 | Vault on k8s (Helm) |
-| certs | 5 | TLS certs (tls provider) |
+| vault | 4 | Vault on k8s (Helm) + Vault Secrets Operator |
 | vault-config | 5 | Vault secrets engines, PKI, DB dynamic creds |
 | linkerd | 6 | Service mesh |
 | argocd | 6 | GitOps controller |
 | aws-alb | 6 | AWS ALB Ingress controller (IRSA + Helm) |
 | alb | 6 | TF-managed ALB + TargetGroup + TargetGroupBinding (frontend) |
 | github-runner | 7 | ARC self-hosted runner (AWS only) |
+
 
 ## GitOps Waves (ArgoCD — App-of-Apps in gitops/apps/, NOT Terraform)
 
@@ -111,8 +111,16 @@ Units include `_common/vault_provider.hcl` or `_common/k8s_providers.hcl` via `r
 - RDS = real Postgres at port 15432
 - State: S3 bucket `tf-state-terragrunt-infra-ap-southeast-1`, DynamoDB table `tf-state-lock`
 - Kubeconfig: `.kubeconfig-ministack` in repo root
+- `rds_master_secret_arn` = `""` in ministack — set `rds_master_password` directly in ministack `env.hcl` instead
 
 ## Provider Versions
 
 - aws ~> 6.42, helm ~> 3.1, kubernetes ~> 2.35, vault ~> 5.2, tls ~> 4.0
 - terraform >= 1.12, terragrunt >= 1.0.3
+
+## vault-config Notes
+
+- `rds_master_secret_arn` — required in production (sourced from `rds` unit output). Leave `""` for ministack.
+- `rds_master_password` — ministack/dev only direct password fallback. Both empty = hard fail at `terraform apply`.
+- DB engine path: `payments-app/database`, role: `payments`, TTL: 1h/24h max.
+- Vault Agent Injector annotations set `agent-init-first: "true"` (init completes before app starts) and `agent-pre-populate-only: "false"` (sidecar renews creds). Defined in `gitops/charts/_lib/templates/_vault.tpl`.
