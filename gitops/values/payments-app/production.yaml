@@ -51,10 +51,10 @@ services:
       role: payments
       secret: payments-app/database/creds/payments
       template: |
-        {{`{{- with secret "payments-app/database/creds/payments" -}}
+        {{- with secret "payments-app/database/creds/payments" -}}
         spring.datasource.url=jdbc:postgresql://payments-app-database:5432/payments?sslmode=require
         spring.datasource.username={{ .Data.username }}
         spring.datasource.password={{ .Data.password }}
         spring.datasource.driver-class-name=org.postgresql.Driver
         spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
-        {{- end }}`}}
+        {{- end }}
