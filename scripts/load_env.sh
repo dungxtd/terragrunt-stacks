@@ -20,6 +20,14 @@ if [ "$ENV" = "ministack" ]; then
   export EKS_CLUSTER_NAME="terragrunt-infra-eks"
   export ARGOCD_SERVER="https://localhost:30443"
 else
+  # Override stale AWS_PROFILE values that may have been set previously
+  # (e.g. older versions of this script set it to "terragrunt" — non-existent
+  # profile in most setups). Force "default" unless caller pre-set something
+  # else AND that profile actually exists.
+  if [ -n "${AWS_PROFILE:-}" ] && ! aws configure list-profiles 2>/dev/null | grep -qx "$AWS_PROFILE"; then
+    echo "  warn: AWS_PROFILE=$AWS_PROFILE not found, falling back to 'default'" >&2
+    unset AWS_PROFILE
+  fi
   : "${AWS_PROFILE:=default}"
   export AWS_PROFILE
   export AWS_REGION="ap-southeast-1"
