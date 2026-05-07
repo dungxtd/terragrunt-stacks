@@ -33,7 +33,7 @@
                 │
   Layer 4 ─── vault-irsa* ── vault ─── rds ────────── Data + Secrets
                 │
-  Layer 5 ─── certs ─── vault-config ──────────────── Vault PKI + Config
+  Layer 5 ─── vault-config ────────────────────────── Vault Config
                 │
   Layer 6 ─── aws-alb ── linkerd ── argocd ── alb ── Platform + GitOps + TF-managed ALB
                 │
@@ -140,20 +140,19 @@
     ├─ 2. ms-reset ─────────── POST /_ministack/reset (wipe all state)
     ├─ 3. ms-seed ──────────── Create S3 bucket + DynamoDB lock table
     │
-    ├─ 4. stack apply ─────── Terragrunt deploys 10 units:
+    ├─ 4. stack apply ─────── Terragrunt deploys 9 units:
     │     ├─ vpc              VPC + subnets (emulated)
     │     ├─ eks              k3s container + kubeconfig
     │     ├─ kms              KMS key (emulated)
     │     ├─ rds              postgres:15 container (real DB)
     │     ├─ vault            Helm: vault dev mode + secrets operator
-    │     ├─ certs            Vault PKI backends (consul CAs)
     │     ├─ vault-config     K8s auth, Transit, DB secrets, KV v2
     │     ├─ linkerd          Helm: CRDs + control plane + viz
     │     ├─ argocd           Helm: ArgoCD (NodePort)
     │     └─ github-runner    SKIPPED (count=0)
     │
     ├─ 5. gitops-bootstrap ── kubectl apply gitops/apps/root.yaml
-    │     └─ Creates: consul, aws-alb, datadog, flagger, payments-app
+    │     └─ Creates: external-secrets, secret-stores, flagger, payments-app
     │
     └─ 6. cleanup ─────────── Kill stale port-forwards
 ```
@@ -194,7 +193,7 @@
 | Resource | AWS | Details |
 |----------|-----|---------|
 | AWS API | Real AWS account | Region: ap-southeast-1 |
-| EKS | AWS EKS 1.29 | m5.large, 2-5 nodes, managed node group |
+| EKS | AWS EKS 1.35.4 | m5.large, 2-5 nodes, managed node group |
 | RDS | AWS RDS PostgreSQL 15 | Multi-AZ, deletion protection, perf insights |
 | Vault | HA mode (Raft storage) | 3 replicas, KMS auto-unseal, SSM token storage |
 | Linkerd certs | Vault PKI (external CA) | `external_ca=true`, issuer from Vault |
@@ -216,7 +215,7 @@
 │  │                          │                                       │  │
 │  │  ┌─ Private Subnets ────┴───────────────────────────────────┐   │  │
 │  │  │                                                           │   │  │
-│  │  │  EKS Cluster (v1.29)                                      │   │  │
+│  │  │  EKS Cluster (v1.35.4)                                    │   │  │
 │  │  │  ┌─ Node Group (m5.large x2-5) ───────────────────────┐  │   │  │
 │  │  │  │                                                      │  │   │  │
 │  │  │  │  Namespaces:                                         │  │   │  │
@@ -232,9 +231,6 @@
 │  │  │  │  ┌─ linkerd ───────────────────────────────────┐    │  │   │  │
 │  │  │  │  │  External CA (certs from Vault PKI)          │    │  │   │  │
 │  │  │  │  │  identity, destination, proxy-injector        │    │  │   │  │
-│  │  │  │  └──────────────────────────────────────────────┘    │  │   │  │
-│  │  │  │  ┌─ consul ────────────────────────────────────┐    │  │   │  │
-│  │  │  │  │  Service mesh (deployed by ArgoCD wave 1)    │    │  │   │  │
 │  │  │  │  └──────────────────────────────────────────────┘    │  │   │  │
 │  │  │  │  ┌─ arc-runners ───────────────────────────────┐    │  │   │  │
 │  │  │  │  │  GitHub Actions Runner Controller            │    │  │   │  │
@@ -287,8 +283,7 @@
     ├─ K8s auth backend
     ├─ Transit key (payments-app)
     ├─ Database secrets (→ RDS)
-    ├─ KV v2 static creds
-    └─ PKI CAs (certs unit)
+    └─ KV v2 static creds
 ```
 
 ---
@@ -331,10 +326,6 @@
 │  │     ├─ password                                                │  │
 │  │     └─ vault_addr                                              │  │
 │  │                                                                │  │
-│  │  PKI — certs unit (3 backends)                                 │  │
-│  │  ├─ consul/server/pki  ── Consul server TLS                    │  │
-│  │  ├─ consul/connect/pki ── Consul Connect mTLS                  │  │
-│  │  └─ consul/api-gw/pki ── Consul API Gateway TLS               │  │
 │  └────────────────────────────────────────────────────────────────┘  │
 │                                                                      │
 │  ┌─ Policy: payments-app-policy ─────────────────────────────────┐  │

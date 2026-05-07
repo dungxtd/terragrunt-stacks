@@ -1,6 +1,6 @@
 # Platform Components — Production Flow
 
-Four core infra components and how they interact in production.
+Three core infra components and how they interact in production.
 
 ---
 
@@ -48,9 +48,6 @@ flowchart LR
                 Flagger["Flagger\ncanary controller"]
             end
 
-            subgraph NSConsul ["Namespace: consul"]
-                ConsulSvr["Consul Server\ncatalog / DNS"]
-            end
         end
 
         subgraph AWS2 ["AWS Services"]
@@ -80,7 +77,6 @@ flowchart LR
     LP1 & LP2 -->|"metrics scrape"| Prom
     Prom -->|"success-rate / p99"| Flagger
     Flagger -->|"adjust weights"| HR
-    App1 & App2 -.->|"DNS lookup"| ConsulSvr
 ```
 
 ### Request lifecycle (step by step)
@@ -336,49 +332,13 @@ flowchart LR
 
 ---
 
-## 4. Consul (Service Catalog)
-
-**Role**: Service discovery catalog only. **No service mesh** (connectInject disabled).
-
-### What it does
-
-```mermaid
-flowchart TD
-    CC[consul-client\nDaemonSet, 1 per node] -->|register| CS[consul-server\nStatefulSet, 3 replicas\nRaft consensus]
-    CS -->|sync| K8sSvc[k8s Services]
-    App[Any app] -->|DNS: svc.service.consul\nor HTTP: /v1/catalog| CS
-```
-
-Consul does **not** inject sidecars or enforce mTLS — that is Linkerd's job. Consul owns catalog + DNS only.
-
-### Why both Consul + Linkerd?
-
-```mermaid
-flowchart LR
-    subgraph Consul
-        C1[Service registration]
-        C2[DNS: svc.service.consul]
-        C3[Health checks]
-    end
-    subgraph Linkerd
-        L1[mTLS between pods]
-        L2[Traffic metrics]
-        L3[Canary weight splits]
-    end
-    Note["Consul Connect disabled.\nNo dual-mesh conflict."]
-```
-
-Consul was the original mesh. Linkerd was added for stronger mTLS and k8s-native metrics. Consul Connect disabled to avoid conflicts. Consul serves catalog/DNS; Linkerd owns all mesh functionality.
-
----
-
 ## Full Component Interaction Map
 
 ```mermaid
 graph TD
     subgraph ArgoCD ["ArgoCD — App-of-Apps"]
         W0[Wave 0\ngateway-api-crds]
-        W1[Wave 1\nlinkerd · consul]
+        W1[Wave 1\nlinkerd]
         W2[Wave 2\ndatadog]
         W3[Wave 3\nflagger · loadtester\nlinkerd-viz-policy]
         W4[Wave 4\npayments-app]

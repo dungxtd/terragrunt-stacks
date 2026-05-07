@@ -89,7 +89,7 @@ sequenceDiagram
   Argo->>K: create AppProject (wave -10)
   Argo->>K: install ExternalSecrets controller (wave 0)
   Argo->>K: ClusterSecretStore + ExternalSecrets (wave 1)
-  Argo->>K: consul, datadog, flagger (waves 1-3)
+  Argo->>K: flagger, kube-prometheus-stack (waves 2-3)
   Argo->>K: payments-app (wave 4)
   Argo->>K: ingresses (wave 5)
   K->>AWS: ALB controller provisions ALBs
@@ -325,7 +325,7 @@ flowchart TB
   F --> G
 ```
 
-Runbooks: [`runbooks/`](runbooks/) — canary stuck, consul stale services.
+Runbooks: [`runbooks/`](runbooks/) — canary stuck, cluster lifecycle.
 
 ---
 

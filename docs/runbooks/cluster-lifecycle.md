@@ -582,7 +582,7 @@ sequenceDiagram
 
     TF->>V: enable database secrets engine (path=payments-app/database)
     TF->>V: enable kv-v2 secrets engine (path=secrets/)
-    TF->>V: enable pki secrets engine (paths: consul/server/pki, etc)
+    TF->>V: enable transit secrets engine (path=transit)
     TF->>V: write database/config/payments (postgres:// URL + admin creds)
     TF->>V: write database/roles/payments (creation_statements, TTL=1h)
     TF->>DB: (Vault) test connection

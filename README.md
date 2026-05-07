@@ -25,7 +25,7 @@ source scripts/load_env.sh
 | 2 | eks | Compute (k3s / EKS) |
 | 3 | kms | Vault auto-unseal |
 | 4 | vault-irsa (AWS HA only), vault, rds | Secrets + Database |
-| 5 | certs, vault-config | PKI + Vault config |
+| 5 | vault-config | Vault config (K8s auth, Transit, DB dynamic creds, KV v2) |
 | 6 | aws-alb, linkerd, argocd, alb | LB controller + service mesh + GitOps + TF-managed ALB |
 | 7 | github-runner | CI/CD (AWS only) |
 
