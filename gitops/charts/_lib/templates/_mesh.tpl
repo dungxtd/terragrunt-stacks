@@ -13,6 +13,9 @@ linkerd.io/inject: enabled
 {{- if $svc.linkerdSkipOutboundPorts }}
 config.linkerd.io/skip-outbound-ports: {{ $svc.linkerdSkipOutboundPorts | quote }}
 {{- end }}
+{{- if $svc.linkerdSkipInboundPorts }}
+config.linkerd.io/skip-inbound-ports: {{ $svc.linkerdSkipInboundPorts | quote }}
+{{- end }}
 {{- end }}
 {{- if eq $ctx.Values.mesh "consul" }}
 consul.hashicorp.com/connect-inject: "true"

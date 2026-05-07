@@ -23,6 +23,7 @@ services:
     port: 8080
     serviceAccount: true
     linkerdSkipOutboundPorts: "8200,8201"
+    linkerdSkipInboundPorts: "8080"   # ALB → pod direct HTTP (no mTLS expected from ALB)
     upstreams:
       - "payments-app-database:5432"
     env:
