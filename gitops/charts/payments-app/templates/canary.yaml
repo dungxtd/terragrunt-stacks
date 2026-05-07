@@ -1,32 +1,31 @@
-{{- if .Values.canary.enabled }}
-# Flagger Linkerd-based canary. Flagger creates payments-app-primary +
-# payments-app-canary Services; the apex `payments-app` Service is split
-# via Linkerd HTTPRoute (policy.linkerd.io). Splitting happens on the
-# caller's outbound proxy, so it works even when target pod has
-# config.linkerd.io/skip-inbound-ports for ALB traffic.
+{{- /*
+  Per-service Flagger Linkerd canary. Opt-in via svc.canary: true on each
+  entry in Values.services. Drop a new service into Values.services with
+  canary: true and a Canary CR is generated for it automatically.
+*/}}
+{{- range $name, $svc := .Values.services }}
+{{- if $svc.canary }}
+---
 apiVersion: flagger.app/v1beta1
 kind: Canary
 metadata:
-  name: payments-app
-  namespace: {{ .Values.namespace }}
+  name: {{ $name }}
+  namespace: {{ $.Values.namespace }}
 spec:
   provider: linkerd
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: payments-app
+    name: {{ $name }}
   progressDeadlineSeconds: 600
   service:
-    port: 8080
-    targetPort: 8080
+    port: {{ $svc.servicePort | default $svc.port }}
+    targetPort: {{ $svc.port }}
   analysis:
-    interval: 30s
-    threshold: 5
-    maxWeight: 50
-    stepWeight: 10
-    # No metric checks: target pod has skip-inbound-ports=8080 (for ALB),
-    # so Linkerd's inbound metrics are empty and request-success-rate
-    # would always fail. Demo relies on webhook smoke test + step weights.
+    interval: {{ $svc.canaryInterval | default "30s" }}
+    threshold: {{ $svc.canaryThreshold | default 5 }}
+    maxWeight: {{ $svc.canaryMaxWeight | default 50 }}
+    stepWeight: {{ $svc.canaryStepWeight | default 10 }}
     webhooks:
       - name: smoke-test
         type: pre-rollout
@@ -34,11 +33,12 @@ spec:
         timeout: 30s
         metadata:
           type: bash
-          cmd: "curl -sf http://payments-app-canary.{{ .Values.namespace }}:8080/actuator/health"
+          cmd: "curl -sf http://{{ $name }}-canary.{{ $.Values.namespace }}:{{ $svc.servicePort | default $svc.port }}{{ $svc.canaryHealthPath | default "/" }}"
       - name: load-test
         type: rollout
         url: http://loadtester.flagger-system/
         timeout: 5s
         metadata:
-          cmd: "hey -z 2m -q 10 -c 2 http://payments-app-canary.{{ .Values.namespace }}:8080/actuator/health"
+          cmd: "hey -z {{ $svc.canaryLoadDuration | default "2m" }} -q 10 -c 2 http://{{ $name }}-canary.{{ $.Values.namespace }}:{{ $svc.servicePort | default $svc.port }}{{ $svc.canaryHealthPath | default "/" }}"
+{{- end }}
 {{- end }}
