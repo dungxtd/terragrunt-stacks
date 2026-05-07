@@ -36,7 +36,7 @@ resource "aws_security_group" "alb" {
 # don't open this by default; without the rule, ALB targets stay
 # "Target.Timeout" → 504 at the listener.
 resource "aws_security_group_rule" "alb_to_node" {
-  description              = "ALB → pod ${var.service_name}:${var.service_port}"
+  description              = "ALB to pod ${var.service_name}:${var.service_port}"
   type                     = "ingress"
   from_port                = var.service_port
   to_port                  = var.service_port
