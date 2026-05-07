@@ -34,8 +34,9 @@ flowchart TB
 
   subgraph "Runtime - in EKS"
     ESO[ExternalSecrets Operator]
-    PAY[payments-app pods]
-    DD[datadog]
+    PAY[payments-app pod]
+    KPS[kube-prometheus-stack]
+    JG[jaeger + hotrod]
     FLAG[flagger canary]
     LINK[linkerd mesh]
   end
@@ -45,23 +46,23 @@ flowchart TB
   DEPLOY -->|terragrunt apply| EKS
   DEPLOY -->|terragrunt apply| VAULT
   DEPLOY -->|terragrunt apply| RDS
+  DEPLOY -->|terragrunt apply| ALB
   GITOPS -.->|waits for deploy| DEPLOY
   GITOPS -->|kubectl apply root.yaml| ROOT
   ROOT --> PROJECT
   ROOT --> APPS
   APPS --> ESO
   APPS --> PAY
-  APPS --> DD
+  APPS --> KPS
+  APPS --> JG
   APPS --> FLAG
   ESO -->|reads secrets| VAULT
-  ESO -->|writes k8s Secret| DD
   PAY -->|Vault Agent inject| VAULT
   PAY -->|RDS dynamic creds| RDS
   PAY <-->|sidecar mTLS| LINK
   VAULT -->|auto-unseal| KMS
   VAULT -->|recovery keys backup| SSM
-  ALB -->|routes /| PAY
-  ALB -->|routes /argocd| ROOT
+  ALB -->|TargetGroupBinding| PAY
 ```
 
 ---
@@ -386,18 +387,21 @@ sequenceDiagram
 
 ---
 
-## Use Case 12: Datadog API Key Missing (Today's Bug)
+## Use Case 12: Observability — kube-prometheus-stack
+
+Datadog removed (API key seeding fragile). Replaced with self-hosted **kube-prometheus-stack** + **Jaeger** for tracing.
 
 ```mermaid
 flowchart LR
-  A[datadog cluster-agent<br/>logs: API Key invalid 403] --> B{Cause}
-  B --> C[Secret/datadog<br/>has no api-key field]
-  C --> D[Operator: vault kv put<br/>secret/datadog/api api-key=...]
-  D --> E[ESO refresh within 1h<br/>OR force-sync annotation]
-  E --> F[Secret/datadog populated]
-  F --> G[kubectl rollout restart<br/>datadog-cluster-agent]
-  G --> H[403 errors stop]
+  POD[Pod stdout/metrics] -->|scrape| PROM[Prometheus<br/>monitoring ns]
+  POD -->|OTLP traces| JG[Jaeger<br/>tracing ns]
+  PROM -->|datasource| GRAFANA[Grafana :3000]
+  LINKVIZ[Linkerd-viz Prometheus] -->|federate| PROM
+  GRAFANA -->|dashboards: cluster, pod, k8s API| OPS[Operator]
+  JG -->|UI :16686| OPS
 ```
+
+Access: `make pf-grafana` / `make pf-prometheus` / `make pf-jaeger`
 
 ---
 

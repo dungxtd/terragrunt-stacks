@@ -28,27 +28,30 @@
   Layer 1 ─── vpc ─────────────────────────────────── Network
                 │
   Layer 2 ─── eks ─────────────────────────────────── Compute (k3s / EKS)
-                │                │
-  Layer 3 ─── kms ──┐           │ ─────────────────── Security
-                     │           │
-  Layer 4 ─── vault-irsa* ─ vault ─── rds ─────────── Data + Secrets
-                │                │
-  Layer 5 ─── certs      ─── vault-config ─────────── Vault PKI + Config
                 │
-  Layer 6 ─── linkerd     ─── argocd ─── aws-alb ── Platform + GitOps
+  Layer 3 ─── kms ─────────────────────────────────── Encryption keys
+                │
+  Layer 4 ─── vault-irsa* ── vault ─── rds ────────── Data + Secrets
+                │
+  Layer 5 ─── certs ─── vault-config ──────────────── Vault PKI + Config
+                │
+  Layer 6 ─── aws-alb ── linkerd ── argocd ── alb ── Platform + GitOps + TF-managed ALB
                 │
   Layer 7 ─── github-runner ───────────────────────── CI/CD (AWS only)
 ```
 
 `vault-irsa` is AWS HA only; MiniStack dev mode skips it.
+`alb` (TF-managed Application Load Balancer + TargetGroup + TargetGroupBinding CR) keeps the LB in TF state for leak-free destroy.
 
 ### GitOps Waves (ArgoCD ApplicationSet)
 
 ```text
-  Wave 1 ─── consul ────────────────── Service mesh
-  Wave 2 ─── datadog ────────────── Monitoring (aws-alb is Terraform-managed)
-  Wave 3 ─── flagger ─────────────── Progressive delivery
-  Wave 4 ─── payments-app ─────────── Application
+  Wave 0 ─── external-secrets ──────────── Vault → k8s Secret operator
+  Wave 1 ─── secret-stores ─────────────── Wire ESO to Vault
+  Wave 2 ─── kube-prometheus-stack ─────── Metrics + Grafana
+  Wave 3 ─── flagger / loadtester ──────── Progressive delivery
+  Wave 4 ─── payments-app ──────────────── RDS-backed Spring Boot service
+  Wave 5 ─── jaeger-demo ───────────────── Distributed tracing demo (Jaeger + HotROD)
 ```
 
 ---

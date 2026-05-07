@@ -436,14 +436,14 @@ gantt
 
     section Bootstrap
     AppProject platform       :done, w-10, -10, -9
-    Gateway API CRDs          :done, w0, 0, 1
+    Gateway API CRDs          :done, w0a, 0, 1
 
-    section Mesh & Catalog
-    Linkerd control-plane     :done, w1a, 1, 2
-    Consul                    :done, w1b, 1, 2
+    section Secrets
+    external-secrets          :done, w0b, 0, 1
+    secret-stores             :done, w1a, 1, 2
 
     section Observability
-    Datadog                   :done, w2, 2, 3
+    kube-prometheus-stack     :done, w2, 2, 3
 
     section Canary Controller
     Flagger                   :done, w3a, 3, 4
@@ -453,6 +453,9 @@ gantt
     section Application
     payments-app              :done, w4, 4, 5
 
-    section Frontend
-    platform-ui               :done, w5, 5, 6
+    section Tracing
+    jaeger-demo               :done, w5, 5, 6
 ```
+
+> **Note:** Linkerd + ArgoCD installed by Terraform (units/linkerd, units/argocd), not ArgoCD waves.
+> Consul + Datadog were removed in favor of `mesh: linkerd` + `kube-prometheus-stack`.

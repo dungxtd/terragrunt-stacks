@@ -1,6 +1,6 @@
 # GitOps — payments-app platform
 
-ArgoCD-managed runtime layer. Terraform handles infra (EKS, RDS, Vault, ArgoCD itself); everything below is delivered by ArgoCD pulling this directory.
+ArgoCD-managed runtime layer. Terraform handles infra (EKS, RDS, Vault, ArgoCD itself, ALB); everything below is delivered by ArgoCD pulling this directory.
 
 ## Layout
 
@@ -8,20 +8,28 @@ ArgoCD-managed runtime layer. Terraform handles infra (EKS, RDS, Vault, ArgoCD i
 gitops/
 ├── apps/                              ← ArgoCD Application + ApplicationSet manifests
 │   ├── root.yaml                      ← App-of-Apps; watches gitops/apps/ recursively
-│   ├── appset-platform.yaml           ← upstream Helm charts (consul, datadog, flagger)
+│   ├── projects.yaml                  ← AppProject `platform` (allowed namespaces, sourceRepos)
+│   ├── gateway-api-crds.yaml          ← Gateway API CRDs
+│   ├── appset-platform.yaml           ← upstream Helm charts (kube-prometheus-stack, flagger, loadtester)
+│   ├── external-secrets.yaml          ← external-secrets-operator
+│   ├── secret-stores.yaml             ← in-house chart wiring SecretStores → Vault
+│   ├── linkerd-viz-policy.yaml        ← Linkerd-viz authz policy
 │   ├── payments-app.yaml              ← in-house chart (gitops/charts/payments-app)
-│   └── platform-ui.yaml               ← raw Ingress manifests (gitops/platform/platform-ui/)
+│   └── jaeger-demo.yaml               ← raw manifests (Jaeger + HotROD demo)
 ├── charts/                            ← in-house Helm charts
 │   ├── _lib/                          ← library chart: lib.workload, lib.mesh, lib.vault
-│   └── payments-app/                  ← single services.yaml loops Values.services
+│   ├── payments-app/                  ← single Spring Boot service using Vault → RDS
+│   └── secret-stores/                 ← SecretStore wiring chart
 ├── values/                            ← per-app, per-env Helm values
-│   ├── consul/production.yaml
-│   ├── datadog/production.yaml
+│   ├── kube-prometheus-stack/production.yaml
 │   ├── flagger/production.yaml
+│   ├── loadtester/production.yaml
+│   ├── external-secrets/production.yaml
+│   ├── secret-stores/production.yaml
 │   └── payments-app/production.yaml
-└── platform/
-    └── platform-ui/                   ← raw kubectl ingress manifests (host-routed ALBs)
-    └── ingresses.yaml
+└── platform/                          ← raw kubectl manifests
+    ├── linkerd-viz-policy/            ← Linkerd-viz authz policy
+    └── jaeger-demo/                   ← Jaeger all-in-one + HotROD deployments
 ```
 
 ## Bootstrap
@@ -40,11 +48,12 @@ Set via `argocd.argoproj.io/sync-wave` annotation in each app file:
 
 | Wave | App | Source |
 |------|-----|--------|
-| 1 | consul | upstream `hashicorp/consul` |
-| 2 | datadog | upstream `datadog/datadog` |
-| 3 | flagger | upstream `flagger/flagger` |
+| 0 | external-secrets | upstream `external-secrets/external-secrets` |
+| 1 | secret-stores | local `gitops/charts/secret-stores` |
+| 2 | kube-prometheus-stack | upstream `prometheus-community/kube-prometheus-stack` |
+| 3 | flagger / loadtester | upstream `flagger/flagger` |
 | 4 | payments-app | local `gitops/charts/payments-app` |
-| 5 | platform-ui | raw manifests `gitops/platform/platform-ui/` |
+| 5 | jaeger-demo | raw manifests `gitops/platform/jaeger-demo/` |
 
 ## Values
 
@@ -57,20 +66,24 @@ Add a new env: drop `gitops/values/<app>/<env>.yaml` and reference it in the mat
 
 ## payments-app Chart
 
-Single source of truth: `gitops/values/payments-app/production.yaml` — contains a `services:` map. `templates/services.yaml` loops the map and includes `lib.workload` for each entry. To add a microservice: add an entry to `services:`. No template changes.
+Single Spring Boot service that uses **Vault dynamic credentials → RDS**. No frontend, no API gateway — pure backend showcase.
 
-Specials kept as standalone templates: `canary.yaml`, `secrets.yaml` (Vault/SOPS), `ingress.yaml`, `service-mesh.yaml`, `serviceaccount.yaml`, `namespace.yaml`, `*-configmap.yaml`, `payments-app-database-service.yaml` (ExternalName for RDS).
+Files:
+- `templates/services.yaml` — loops `Values.services` (currently one entry)
+- `templates/secrets.yaml` — VaultConnection + VaultAuth (vault-secrets-operator)
+- `templates/payments-app-database-service.yaml` — ExternalName service → RDS endpoint
+- `templates/serviceaccount.yaml` — `payments-app` SA bound to Vault role
 
-## Ingresses (ALBs)
+To add a service: add entry to `services:` in values. No template changes.
 
-Shared ALB (`alb.ingress.kubernetes.io/group.name: platform`):
-- `argocd-ui` → `/argocd` → argocd-server
-- `payments-app` → `/` → frontend
+## ALB
 
-Dedicated ALBs (subpath broken — UIs hardcode asset paths):
-- `consul-ui`, `vault-ui`, `linkerd-viz`
+The single public ALB is **TF-managed** in `units/alb/`. K8s `TargetGroupBinding` (also TF) registers `payments-app` pods to the AWS Target Group. Other UIs (ArgoCD, Vault, Linkerd-viz, Jaeger, HotROD, Grafana, Prometheus) accessed via `make pf-all` port-forwards.
 
-## Known Runtime Gaps
+## Observability stack (replacement for Datadog)
 
-- Datadog `403 API Key invalid` — needs real `DD_API_KEY` in `Secret/datadog-cluster-agent` (recommend ExternalSecrets pulling from Vault)
-- Flagger canary stuck `Initializing` — needs `linkerd-smi` extension (Linkerd ≥2.14 dropped SMI by default)
+| Tool | Use |
+|------|-----|
+| **kube-prometheus-stack** | cluster + pod metrics, Grafana dashboards |
+| **Linkerd-viz Prometheus** | mesh-level golden metrics |
+| **Jaeger + HotROD** | distributed tracing demo |
