@@ -49,10 +49,14 @@ docs/                 — architecture.md, adr/, runbooks/, archive/
 
 ## GitOps Waves (ArgoCD — App-of-Apps in gitops/apps/, NOT Terraform)
 
-Wave 0: external-secrets → Wave 1: secret-stores → Wave 2: kube-prometheus-stack → Wave 3: flagger/loadtester → Wave 4: payments-app
+Wave 0: external-secrets → Wave 1: secret-stores → Wave 2: kube-prometheus-stack → Wave 3: argo-rollouts (flagger/loadtester commented out) → Wave 4: payments-app
 
 Pinned chart versions live in `gitops/apps/appset-platform.yaml`:
-kube-prometheus-stack=65.2.0, flagger=1.43.0, loadtester=0.37.0
+kube-prometheus-stack=65.2.0, flagger=1.43.0 (commented), loadtester=0.37.0 (commented), argo-rollouts=2.40.9 (controller v1.9.0)
+
+Argo Rollouts uses real HTTP traffic split via Gateway API plugin (`argoproj-labs/gatewayAPI` v0.13.0): plugin patches `HTTPRoute.spec.rules[*].backendRefs[*].weight` between stable+canary Services. Linkerd 2.14+ HTTPRoute parentRef=Service. Canary safety: smoke-test (Job/curl) + Linkerd success-rate + p99 latency AnalysisTemplates from Linkerd-viz Prometheus (`direction=outbound`, queried from caller side to bypass `skip-inbound-ports` on payments-app). Per-service knobs in values: `rollout: true`, `gatewayHttpRoute: true`, `replicas: 2`. PDB rendered automatically by `lib.rollout` (`minAvailable: 1`).
+
+Flagger is disabled in code: AppSet entries for flagger + loadtester are commented out in `gitops/apps/appset-platform.yaml`; argo-rollouts is the active progressive-delivery controller. Flagger values files (`gitops/values/flagger/production.yaml`, `gitops/values/loadtester/production.yaml`) and `_canary.tpl` template kept intact. Canary CR rendering is gated by `canary.enabled` + per-service `canary` flag in `gitops/values/payments-app/production.yaml` (both currently false). Re-enable flagger: uncomment AppSet entries + flip canary flags.
 
 ## Key Commands
 

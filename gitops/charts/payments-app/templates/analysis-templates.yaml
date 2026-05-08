@@ -1,0 +1,111 @@
+{{- if .Values.rollout.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: smoke-test
+  namespace: {{ .Values.namespace }}
+spec:
+  args:
+    - name: service-name
+    - name: namespace
+    - name: health-path
+      value: "/"
+    - name: service-port
+      value: "8080"
+  metrics:
+    - name: smoke
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              metadata:
+                annotations:
+                  linkerd.io/inject: disabled
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: curl
+                    image: curlimages/curl:8.20.0
+                    command: [sh, -c]
+                    args:
+                      - |
+                        set -eu
+                        URL="http://{{`{{args.service-name}}`}}-canary.{{`{{args.namespace}}`}}:{{`{{args.service-port}}`}}{{`{{args.health-path}}`}}"
+                        for i in 1 2 3 4 5 6 7 8 9 10; do
+                          curl -fsS --max-time 5 "$URL" > /dev/null
+                          sleep 1
+                        done
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+  namespace: {{ .Values.namespace }}
+spec:
+  args:
+    - name: service-name
+    - name: namespace
+  metrics:
+    - name: success-rate
+      interval: {{ .Values.rollout.analysisInterval | default "1m" }}
+      count: {{ .Values.rollout.analysisCount | default 5 }}
+      successCondition: "len(result) == 0 || result[0] >= 0.95"
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: {{ .Values.rollout.metricsServer | default "http://prometheus.linkerd-viz:9090" | quote }}
+          query: |
+            sum(
+              rate(
+                response_total{
+                  namespace="{{`{{args.namespace}}`}}",
+                  deployment="{{`{{args.service-name}}`}}",
+                  classification!="failure",
+                  direction="outbound"
+                }[1m]
+              )
+            )
+            /
+            sum(
+              rate(
+                response_total{
+                  namespace="{{`{{args.namespace}}`}}",
+                  deployment="{{`{{args.service-name}}`}}",
+                  direction="outbound"
+                }[1m]
+              )
+            )
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: latency-p99
+  namespace: {{ .Values.namespace }}
+spec:
+  args:
+    - name: service-name
+    - name: namespace
+  metrics:
+    - name: latency-p99
+      interval: {{ .Values.rollout.analysisInterval | default "1m" }}
+      count: {{ .Values.rollout.analysisCount | default 5 }}
+      successCondition: "len(result) == 0 || result[0] <= 500"
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: {{ .Values.rollout.metricsServer | default "http://prometheus.linkerd-viz:9090" | quote }}
+          query: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(
+                  response_latency_ms_bucket{
+                    namespace="{{`{{args.namespace}}`}}",
+                    deployment="{{`{{args.service-name}}`}}",
+                    direction="outbound"
+                  }[1m]
+                )
+              ) by (le)
+            )
+{{- end }}

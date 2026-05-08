@@ -1,0 +1,25 @@
+controller:
+  replicas: 1
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false   # flip true once kube-prometheus-stack ServiceMonitor selector matches
+
+  # Gateway API trafficRouter plugin — patches HTTPRoute weights during canary
+  trafficRouterPlugins:
+    - name: "argoproj-labs/gatewayAPI"
+      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.13.0/gatewayapi-plugin-linux-amd64"
+      sha256: ""
+
+dashboard:
+  enabled: true
+  replicas: 1
+  # NOTE: dashboard exposed via port-forward only — no Ingress, no auth.
+  # `kubectl argo rollouts dashboard -n argo-rollouts` then http://localhost:3100
+
+# Linkerd injection — controller talks to mesh-internal services for analysis queries
+podAnnotations:
+  linkerd.io/inject: enabled
+
+# Keep CRDs across uninstall
+keepCRDs: true

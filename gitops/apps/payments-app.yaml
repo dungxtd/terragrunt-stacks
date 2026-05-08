@@ -28,11 +28,26 @@ spec:
       name: payments-app
       jsonPointers:
         - /spec/replicas
+    - group: argoproj.io
+      kind: Rollout
+      name: payments-app
+      jsonPointers:
+        - /spec/replicas         # Rollouts scales itself during canary
     - group: ""
       kind: Service
       name: payments-app
       jsonPointers:
+        - /spec/selector         # Rollouts patches selector with rollouts-pod-template-hash
+    - group: ""
+      kind: Service
+      name: payments-app-canary
+      jsonPointers:
         - /spec/selector
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: payments-app
+      jsonPointers:
+        - /spec/rules         # gateway-api plugin patches backendRefs[*].weight
   syncPolicy:
     automated:
       prune: true

@@ -14,6 +14,9 @@
 {{- $ctx := .ctx -}}
 {{- $sa := dig "serviceAccount" false $svc -}}
 {{- $renderService := ne (toString (default true $svc.service)) "false" -}}
+{{- if $svc.rollout -}}
+{{ include "lib.rollout" (dict "ctx" $ctx "name" $name "svc" $svc) }}
+{{- else -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -96,4 +99,5 @@ spec:
       targetPort: {{ $svc.port }}
       name: {{ default "http" $svc.portName }}
 {{ end }}
+{{- end }}
 {{- end }}

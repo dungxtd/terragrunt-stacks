@@ -14,18 +14,26 @@ spec:
             namespace: monitoring
             wave: "2"
 
-          - app: flagger
-            repoURL: https://flagger.app
-            chart: flagger
-            targetRevision: "1.43.0"
-            namespace: flagger-system
-            wave: "3"
+          # Flagger disabled — superseded by argo-rollouts. Uncomment to re-enable.
+          # - app: flagger
+          #   repoURL: https://flagger.app
+          #   chart: flagger
+          #   targetRevision: "1.43.0"
+          #   namespace: flagger-system
+          #   wave: "3"
+          #
+          # - app: loadtester
+          #   repoURL: https://flagger.app
+          #   chart: loadtester
+          #   targetRevision: "0.37.0"
+          #   namespace: flagger-system
+          #   wave: "3"
 
-          - app: loadtester
-            repoURL: https://flagger.app
-            chart: loadtester
-            targetRevision: "0.37.0"
-            namespace: flagger-system
+          - app: argo-rollouts
+            repoURL: https://argoproj.github.io/argo-helm
+            chart: argo-rollouts
+            targetRevision: "2.40.9"
+            namespace: argo-rollouts
             wave: "3"
 
   template:
