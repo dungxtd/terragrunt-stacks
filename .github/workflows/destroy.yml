@@ -95,21 +95,33 @@ jobs:
           done
           kubectl -n argocd delete applications.argoproj.io --all --timeout=60s || true
 
-      # Phase 2: drain residual k8s resources not owned by ArgoCD
+      # Phase 2: drain residual k8s resources NOT owned by ArgoCD or terragrunt.
+      # Skip terragrunt-managed namespaces (vault, argocd, linkerd*, kube-system,
+      # vault-secrets-operator-system) — their helm_release destroy handles SS+PVC.
+      # Killing vault SS here breaks vault-config destroy (no API to call).
       - name: Drain residual k8s resources
         run: |
           if ! kubectl get ns >/dev/null 2>&1; then
             echo "cluster unreachable, skip"; exit 0
           fi
-          kubectl delete ingress --all -A --timeout=180s || true
-          kubectl get svc -A -o json \
-            | jq -r '.items[] | select(.spec.type=="LoadBalancer") | "\(.metadata.namespace) \(.metadata.name)"' \
-            | while read ns name; do kubectl -n "$ns" delete svc "$name" --timeout=120s || true; done
-          # delete StatefulSets first to release PVCs cleanly
-          for ns in vault consul; do
-            kubectl -n "$ns" delete statefulset --all --timeout=120s 2>/dev/null || true
+
+          # TargetGroupBindings: drain BEFORE aws-alb controller dies, so finalizer
+          # deregisters targets cleanly. alb unit's kubernetes_manifest destroy
+          # then becomes a no-op (CR already gone → 404 tolerated).
+          kubectl delete targetgroupbindings.elbv2.k8s.aws -A --all --timeout=120s --ignore-not-found || true
+
+          # ArgoCD-managed app namespaces only — leave terragrunt-managed alone
+          PROTECTED="vault|vault-secrets-operator-system|argocd|linkerd|linkerd-viz|kube-system|kube-public|kube-node-lease|default"
+          APP_NS=$(kubectl get ns -o jsonpath='{.items[*].metadata.name}' \
+            | tr ' ' '\n' | grep -Ev "^(${PROTECTED})$" || true)
+
+          for ns in $APP_NS; do
+            kubectl -n "$ns" delete ingress --all --timeout=120s --ignore-not-found || true
+            kubectl get svc -n "$ns" -o json 2>/dev/null \
+              | jq -r '.items[] | select(.spec.type=="LoadBalancer") | .metadata.name' \
+              | while read svc; do kubectl -n "$ns" delete svc "$svc" --timeout=120s || true; done
+            kubectl -n "$ns" delete pvc --all --timeout=120s --ignore-not-found || true
           done
-          kubectl delete pvc --all -A --timeout=180s || true
 
       # Phase 3: wait AWS controllers (ALB, ebs-csi) finish reconciling
       - name: Wait AWS reconciliation
