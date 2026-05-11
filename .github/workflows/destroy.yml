@@ -57,12 +57,6 @@ jobs:
       - name: Setup kubectl
         uses: azure/setup-kubectl@v5
 
-      - name: Setup ArgoCD CLI
-        run: |
-          curl -sL https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 \
-            -o /usr/local/bin/argocd
-          chmod +x /usr/local/bin/argocd
-
       # vault provider's before_hook port-forwards Vault via kubectl. certs and
       # vault-config destroy first (depend on Vault) — kubeconfig must exist
       # before Terragrunt runs. Tolerate missing cluster (already destroyed).
@@ -72,68 +66,34 @@ jobs:
             echo "kubeconfig not generated (cluster may already be destroyed)"
 
       # Phase 1: ArgoCD cascade — finalizer-driven graceful teardown.
-      # Deletes root app → cascades to ApplicationSet + child apps (Ingress,
-      # PVC, Service LB) in reverse sync-wave order. AWS controllers reconcile
-      # ALB / EBS / NLB cleanup before VPC dies.
+      # Stop ApplicationSet controller (so it stops re-creating apps), then
+      # delete ApplicationSets + Applications. resources-finalizer triggers
+      # argocd-application-controller to delete managed k8s resources
+      # (Ingress, PVC, Service LB) in reverse sync-wave order. AWS controllers
+      # reconcile ALB / EBS / NLB cleanup before VPC dies.
       - name: ArgoCD cascade delete
         run: |
           if ! kubectl get ns argocd >/dev/null 2>&1; then
             echo "argocd namespace gone, skip"; exit 0
           fi
 
-          # Require argocd-server Ready before attempting CLI path
-          if ! kubectl -n argocd wait --for=condition=Available deploy/argocd-server --timeout=60s 2>/dev/null; then
-            echo "argocd-server not Ready, fallback to kubectl delete"
-            kubectl -n argocd delete applications.argoproj.io --all --cascade=foreground --timeout=600s || true
-            kubectl -n argocd delete applicationsets.argoproj.io --all --timeout=120s || true
-            exit 0
-          fi
+          # Stop ApplicationSet controller — prevents app re-creation during teardown
+          kubectl -n argocd scale deploy/argocd-applicationset-controller --replicas=0 || true
 
-          kubectl -n argocd port-forward svc/argocd-server 8080:443 >/tmp/pf.log 2>&1 &
-          PF=$!
-          trap "kill $PF 2>/dev/null || true" EXIT
+          # Delete ApplicationSets first (no finalizers, frees template-owned apps)
+          kubectl -n argocd delete applicationsets.argoproj.io --all --timeout=120s || true
 
-          # Poll until port-forward binds (cold runner can take 5–15s)
-          for i in $(seq 1 30); do
-            if (exec 3<>/dev/tcp/localhost/8080) 2>/dev/null; then
-              exec 3<&- 3>&-
-              echo "port-forward ready after ${i}s"; break
-            fi
-            sleep 1
-          done
+          # Delete root app → resources-finalizer cascades children in reverse wave order
+          kubectl -n argocd delete application root --cascade=foreground --timeout=600s || true
 
-          PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret \
-            -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
-          if [ -z "$PASS" ]; then
-            echo "argocd admin secret missing, fallback to kubectl delete"
-            kubectl -n argocd delete applications.argoproj.io --all --cascade=foreground --timeout=600s || true
-            kubectl -n argocd delete applicationsets.argoproj.io --all --timeout=120s || true
-            exit 0
-          fi
+          # Catch any leftover apps not owned by root (linkerd-viz-policy, jaeger-demo, etc.)
+          kubectl -n argocd delete applications.argoproj.io --all --cascade=foreground --timeout=600s || true
 
-          if ! argocd login localhost:8080 --username admin --password "$PASS" --insecure --plaintext=false; then
-            echo "argocd login failed, fallback to kubectl delete"
-            kubectl -n argocd delete applications.argoproj.io --all --cascade=foreground --timeout=600s || true
-            kubectl -n argocd delete applicationsets.argoproj.io --all --timeout=120s || true
-            exit 0
-          fi
-
-          # Delete root app → cascades to all children (resources-finalizer in CRs)
-          argocd app delete root --cascade --propagation-policy=foreground -y || true
-
-          # Wait for all apps to drain
-          for i in $(seq 1 90); do
-            COUNT=$(argocd app list -o name 2>/dev/null | grep -c . || echo 0)
-            [ "$COUNT" -eq 0 ] && { echo "all apps drained"; break; }
-            echo "wait apps drain ($i/90): $COUNT remain"
-            sleep 10
-          done
-
-          # Strip stuck finalizers as last resort
+          # Strip stuck finalizers as last resort (controller dead / never reconciled)
           for app in $(kubectl -n argocd get applications.argoproj.io -o name 2>/dev/null); do
             kubectl -n argocd patch "$app" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
           done
-          kubectl -n argocd delete applicationsets.argoproj.io --all --timeout=60s || true
+          kubectl -n argocd delete applications.argoproj.io --all --timeout=60s || true
 
       # Phase 2: drain residual k8s resources not owned by ArgoCD
       - name: Drain residual k8s resources
