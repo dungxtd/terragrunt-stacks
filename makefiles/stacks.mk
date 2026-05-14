@@ -13,3 +13,7 @@ endef
 
 $(eval $(call stack-rule,vault,production,vault-consul))
 $(eval $(call stack-rule,vault,ministack,vault-consul))
+
+.PHONY: stack-vault-production-validate
+stack-vault-production-validate: stack-vault-production-generate ## Validate all units in vault-consul/production stack
+	cd $(STACKS)/vault-consul/production && terragrunt run --all validate $(TG_FLAGS)

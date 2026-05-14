@@ -1,8 +1,11 @@
 # Kubernetes / ArgoCD / payments-app smoke tests + cleanup.
 
-.PHONY: alb-crds
+.PHONY: alb-crds iam-check
 alb-crds: ## Apply latest aws-load-balancer-controller CRDs (required after v3.x upgrade)
 	kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+
+iam-check: ## Simulate key IAM actions against current role — CI pre-apply gate
+	$(SCRIPTS_DIR)/iam-check.sh
 
 AWS_REGION      ?= ap-southeast-1
 EKS_CLUSTER     ?= terragrunt-infra-eks

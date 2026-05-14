@@ -44,12 +44,13 @@ generate "vault_provider" {
   EOF
 }
 
+# CI runs `make predestroy-production` (which calls scripts/vault-portforward.sh start)
+# before Terragrunt, so port 18200 is already open and healthy when this hook fires.
+# Hook delegates to the same script — idempotent, skips start if port already open.
+# For local dev (make apply-vault-config etc.) the script starts the port-forward itself.
 terraform {
   before_hook "vault_port_forward" {
     commands = ["apply", "plan", "destroy"]
-    execute = [
-      "bash", "-c",
-      "if lsof -i :${local._vault_port} >/dev/null 2>&1; then echo 'vault port-forward already running'; else KUBECONFIG=${local._kubeconfig} kubectl port-forward svc/vault ${local._vault_port}:8200 -n vault >/dev/null 2>&1 & sleep 3 && echo 'vault port-forward started on :${local._vault_port}'; fi"
-    ]
+    execute  = ["bash", "-c", "KUBECONFIG=${local._kubeconfig} ${get_repo_root()}/scripts/vault-portforward.sh start ${local._vault_port}"]
   }
 }

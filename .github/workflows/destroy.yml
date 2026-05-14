@@ -16,15 +16,13 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: ap-southeast-1
-  TF_VERSION: "1.12.2"
-  TG_VERSION: "1.0.3"
-  TG_FLAGS: --non-interactive --backend-bootstrap
+  AWS_REGION:   ap-southeast-1
+  TF_VERSION:   "1.12.2"
+  # TG_VERSION omitted — Makefile is the single source; `make setup-terragrunt` installs it
+  CLUSTER_NAME: terragrunt-infra-eks
+  PROJECT_TAG:  terragrunt-infra
   STATE_BUCKET: tf-state-terragrunt-stacks
   STATE_PREFIX: stacks/vault-consul/production
-  STATE_UNITS: vpc eks kms rds vault-irsa vault vault-config linkerd argocd aws-alb alb github-runner
-  CLUSTER_NAME: terragrunt-infra-eks
-  PROJECT_TAG: terragrunt-infra
 
 jobs:
   destroy:
@@ -49,132 +47,29 @@ jobs:
           terraform_wrapper: false
 
       - name: Setup Terragrunt
-        run: |
-          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64" \
-            -o /usr/local/bin/terragrunt
-          chmod +x /usr/local/bin/terragrunt
+        run: make setup-terragrunt
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v5
 
-      # vault provider's before_hook port-forwards Vault via kubectl. certs and
-      # vault-config destroy first (depend on Vault) — kubeconfig must exist
-      # before Terragrunt runs. Tolerate missing cluster (already destroyed).
       - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} || \
-            echo "kubeconfig not generated (cluster may already be destroyed)"
+        run: make kubeconfig || echo "cluster may already be destroyed"
 
-      # Phase 1: ArgoCD cascade — finalizer-driven graceful teardown.
-      # Stop ApplicationSet controller (so it stops re-creating apps), then
-      # delete ApplicationSets + Applications. resources-finalizer triggers
-      # argocd-application-controller to delete managed k8s resources
-      # (Ingress, PVC, Service LB) in reverse sync-wave order. AWS controllers
-      # reconcile ALB / EBS / NLB cleanup before VPC dies.
-      - name: ArgoCD cascade delete
-        run: |
-          if ! kubectl get ns argocd >/dev/null 2>&1; then
-            echo "argocd namespace gone, skip"; exit 0
-          fi
-
-          # Stop ApplicationSet controller — prevents app re-creation during teardown
-          kubectl -n argocd scale deploy/argocd-applicationset-controller --replicas=0 || true
-
-          # Delete ApplicationSets first (no finalizers, frees template-owned apps)
-          kubectl -n argocd delete applicationsets.argoproj.io --all --timeout=120s || true
-
-          # Delete root app → resources-finalizer cascades children in reverse wave order
-          kubectl -n argocd delete application root --cascade=foreground --timeout=600s || true
-
-          # Catch any leftover apps not owned by root (linkerd-viz-policy, jaeger-demo, etc.)
-          kubectl -n argocd delete applications.argoproj.io --all --cascade=foreground --timeout=600s || true
-
-          # Strip stuck finalizers as last resort (controller dead / never reconciled)
-          for app in $(kubectl -n argocd get applications.argoproj.io -o name 2>/dev/null); do
-            kubectl -n argocd patch "$app" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
-          done
-          kubectl -n argocd delete applications.argoproj.io --all --timeout=60s || true
-
-      # Phase 2: drain residual k8s resources NOT owned by ArgoCD or terragrunt.
-      # Skip terragrunt-managed namespaces (vault, argocd, linkerd*, kube-system,
-      # vault-secrets-operator-system) — their helm_release destroy handles SS+PVC.
-      # Killing vault SS here breaks vault-config destroy (no API to call).
-      - name: Drain residual k8s resources
-        run: |
-          if ! kubectl get ns >/dev/null 2>&1; then
-            echo "cluster unreachable, skip"; exit 0
-          fi
-
-          # TargetGroupBindings: drain BEFORE aws-alb controller dies, so finalizer
-          # deregisters targets cleanly. alb unit's kubernetes_manifest destroy
-          # then becomes a no-op (CR already gone → 404 tolerated).
-          kubectl delete targetgroupbindings.elbv2.k8s.aws -A --all --timeout=120s --ignore-not-found || true
-
-          # ArgoCD-managed app namespaces only — leave terragrunt-managed alone
-          PROTECTED="vault|vault-secrets-operator-system|argocd|linkerd|linkerd-viz|kube-system|kube-public|kube-node-lease|default"
-          APP_NS=$(kubectl get ns -o jsonpath='{.items[*].metadata.name}' \
-            | tr ' ' '\n' | grep -Ev "^(${PROTECTED})$" || true)
-
-          for ns in $APP_NS; do
-            kubectl -n "$ns" delete ingress --all --timeout=120s --ignore-not-found || true
-            kubectl get svc -n "$ns" -o json 2>/dev/null \
-              | jq -r '.items[] | select(.spec.type=="LoadBalancer") | .metadata.name' \
-              | while read svc; do kubectl -n "$ns" delete svc "$svc" --timeout=120s || true; done
-            kubectl -n "$ns" delete pvc --all --timeout=120s --ignore-not-found || true
-          done
-
-      # Phase 3: wait AWS controllers (ALB, ebs-csi) finish reconciling
-      - name: Wait AWS reconciliation
-        run: |
-          VPC=$(aws ec2 describe-vpcs --region $AWS_REGION \
-            --filters "Name=tag:Project,Values=$PROJECT_TAG" \
-            --query "Vpcs[0].VpcId" --output text 2>/dev/null || echo "None")
-          [ "$VPC" = "None" ] || [ -z "$VPC" ] && { echo "no VPC, skip"; exit 0; }
-
-          echo "wait LBs gone in $VPC..."
-          for i in $(seq 1 60); do
-            LBS=$(aws elbv2 describe-load-balancers --region $AWS_REGION \
-              --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text)
-            [ -z "$LBS" ] && break
-            echo "  ($i/60) waiting..."; sleep 10
-          done
-
-          echo "wait EBS gone..."
-          for i in $(seq 1 30); do
-            VOLS=$(aws ec2 describe-volumes --region $AWS_REGION \
-              --filters "Name=tag:kubernetes.io/cluster/${CLUSTER_NAME},Values=owned" \
-              --query "Volumes[?State!='deleted'].VolumeId" --output text)
-            [ -z "$VOLS" ] && break
-            echo "  ($i/30) waiting: $VOLS"; sleep 10
-          done
+      - name: Pre-destroy
+        run: make predestroy-production
 
       - name: Force-unlock stale locks
         if: github.event.inputs.force_unlock == 'true'
-        run: |
-          echo "Scanning for stale locks in DynamoDB..."
-          LOCKS=$(aws dynamodb scan \
-            --table-name tf-state-lock \
-            --filter-expression "begins_with(LockID, :prefix)" \
-            --expression-attribute-values "{\":prefix\":{\"S\":\"${STATE_BUCKET}/${STATE_PREFIX}\"}}" \
-            --query "Items[].LockID.S" \
-            --output text)
+        run: make force-unlock
 
-          if [ -z "$LOCKS" ]; then
-            echo "No locks found."
-          else
-            for LOCK_ID in $LOCKS; do
-              echo "Deleting lock: $LOCK_ID"
-              aws dynamodb delete-item \
-                --table-name tf-state-lock \
-                --key "{\"LockID\":{\"S\":\"${LOCK_ID}\"}}"
-            done
-            echo "All locks cleared."
-          fi
-
-      - name: Terragrunt destroy
+      - name: Destroy
         env:
           GITHUB_CONFIG_URL: ${{ secrets.GITHUB_CONFIG_URL }}
           GITHUB_APP_ID: ${{ secrets.ARC_APP_ID }}
           GITHUB_APP_INSTALLATION_ID: ${{ secrets.ARC_APP_INSTALLATION_ID }}
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.ARC_APP_PRIVATE_KEY }}
         run: make stack-vault-production destroy
+
+      - name: Post-destroy
+        if: always()
+        run: make postdestroy-production

@@ -6,6 +6,15 @@ UNITS    := units
 GITOPS_DIR := gitops
 TG_FLAGS := --non-interactive --backend-bootstrap
 
+# Tool versions — single source of truth for both workflows and local dev.
+# Bump here; CI picks up automatically via `make setup-terragrunt`.
+TF_VERSION := 1.12.2
+TG_VERSION := 1.0.3
+
+# Absolute path to scripts/ — safe regardless of cwd when make is invoked.
+REPO_ROOT   := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
+SCRIPTS_DIR := $(REPO_ROOT)/scripts
+
 MINISTACK_NAME          := ministack
 MINISTACK_PORT          := 4566
 MINISTACK_EP            := http://localhost:$(MINISTACK_PORT)
@@ -20,6 +29,7 @@ include makefiles/k8s.mk
 include makefiles/vault.mk
 include makefiles/ministack.mk
 include makefiles/util.mk
+include makefiles/destroy.mk
 
 .PHONY: help
 help: ## Show this help
