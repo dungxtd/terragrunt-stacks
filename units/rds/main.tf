@@ -51,7 +51,7 @@ module "rds" {
 }
 
 resource "aws_security_group" "rds" {
-  name_prefix = "${var.project}-rds-"
+  name = "${var.project}-rds"
   description = "RDS PostgreSQL security group"
   vpc_id      = var.vpc_id
 
