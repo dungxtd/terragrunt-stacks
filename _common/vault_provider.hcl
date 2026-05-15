@@ -18,12 +18,15 @@ locals {
   _ssm_token_name  = "/terragrunt-infra/vault/root-token"
 }
 
-# Ordering-only dependency: ensures vault unit (Helm install + after_hook)
-# completes before this unit applies. Outputs not consumed.
+# Ordering dependency: ensures vault unit completes before this unit applies.
+# vault_address consumed by vault-config inputs; mock used when vault state is
+# empty (destroy order: vault-config destroys first, vault state already gone).
 dependency "vault" {
   config_path = "../vault"
 
-  mock_outputs                            = {}
+  mock_outputs = {
+    vault_address = "http://vault.vault.svc.cluster.local:8200"
+  }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
